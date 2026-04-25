@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Batch Actions</h1>
+    <p class="muted">Eksekusi konfigurasi ke satu atau banyak router sekaligus.</p>
+  </div>
+  <div class="actions">
+    <button class="button secondary small" onclick="openCommandModal()">Help / Commands</button>
+    <a class="button secondary small" href="{{ url_for('dashboard') }}">← Back</a>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Eksekusi Batch</h2>
+    <form method="post" id="batchForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <!-- Kredensial SSH buat Batch (pake session global) -->
+      <details {% if not session.get('global_password') %}open{% endif %}>
+        <summary class="muted small">Kredensial SSH (opsional jika sudah di-set lewat Credentials)</summary>
+        <div class="form-row" style="margin-top:12px;">
+          <div class="form-group">
+            <label for="device_username">Username</label>
+            <input id="device_username" name="device_username" value="{{ default_device_username }}" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="device_password">Password</label>
+            <input id="device_password" name="device_password" type="password" placeholder="Isi untuk memperbarui" autocomplete="new-password">
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label for="device_secret">Enable Secret</label>
+            <input id="device_secret" name="device_secret" type="password" placeholder="Opsional">
+          </div>
+        </div>
+      </details>
+
+      <hr style="margin:16px 0;">
+
+      <label for="batch_rows" style="margin-bottom: 6px;">Batch Rows</label>
+      <p class="muted small" style="margin-bottom: 10px;">Format: <code>device1;device2, interface, action, value</code>  &nbsp;—&nbsp;
+        Contoh: <code>r1;r2, GigabitEthernet0/0, change, 192.168.10.1/24</code> atau <code>r1,,ssh_port,2022</code></p>
+      <textarea id="batch_rows" name="batch_rows"
+        placeholder="r1, GigabitEthernet0/0, add, 192.168.10.1/24&#10;r1;r2, Loopback0, description, ke-upstream"
+        rows="8">{% if batch_rows %}{% for r in batch_rows %}{{ r.device_ids | join(';') }},{{ r.interface }},{{ r.action }},{{ r.value }}
+{% endfor %}{% endif %}</textarea>
+
+      <div class="actions" style="margin-top:16px;">
+        <button type="submit" id="execBtn">Execute</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Kanan: Info inventory -->
+  <div class="card">
+    <h2>Inventory</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Host</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for device in inventory %}
+        <tr>
+          <td><strong>{{ device.id }}</strong></td>
+          <td><code>{{ device.host }}</code></td>
+          <td>{{ device.role }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if parse_errors %}
+    <div class="alert error" style="margin-top:16px;">
+      <strong>Parse Error</strong>
+      <ul style="margin:8px 0 0 16px;">
+        {% for item in parse_errors %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if results %}
+    <div style="margin-top:16px;">
+      <h3> Berhasil ({{ results.successful | length }})</h3>
+      {% if results.successful %}
+      <table>
+        <thead>
+          <tr>
+            <th>Line</th>
+            <th>Device</th>
+            <th>Interface</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results.successful %}
+          <tr>
+            <td>{{ r.line_number }}</td>
+            <td>{{ r.device }}</td>
+            <td><code>{{ r.interface }}</code></td>
+            <td>{{ r.action }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">Tidak ada yang berhasil.</p>
+      {% endif %}
+
+      <h3 style="margin-top:16px;"> Gagal ({{ results.failed | length }})</h3>
+      {% if results.failed %}
+      <table>
+        <thead>
+          <tr>
+            <th>Line</th>
+            <th>Device</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results.failed %}
+          <tr>
+            <td>{{ r.line_number }}</td>
+            <td>{{ r.device }}</td>
+            <td class="text-error">{{ r.error }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">Semua berhasil!</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal Referensi Command -->
+<div id="commandModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <h3>📋 Command Reference</h3>
+      <button class="modal-close" onclick="closeCommandModal()">✕</button>
+    </div>
+    <div class="modal-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Aliases</th>
+            <th>Value</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>add</code></td>
+            <td><code>change</code>, <code>set</code>, <code>ip</code></td>
+            <td><code>192.168.1.1/24</code></td>
+            <td>Menambahkan / mengubah IP. Tanpa prefix → /24.</td>
+          </tr>
+          <tr>
+            <td><code>delete</code></td>
+            <td><code>remove</code>, <code>unset</code></td>
+            <td>—</td>
+            <td>Menghapus IP dari interface.</td>
+          </tr>
+          <tr>
+            <td><code>description</code></td>
+            <td><code>desc</code>, <code>label</code></td>
+            <td>Teks bebas</td>
+            <td>Mengubah deskripsi interface.</td>
+          </tr>
+          <tr>
+            <td><code>ssh_port</code></td>
+            <td>—</td>
+            <td><code>Port (1-65535)</code></td>
+            <td>Ubah SSH port router. Kolom interface dibiarkan kosong.</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 style="margin-top:20px;">Contoh Batch Rows</h4>
+      <pre>r1, GigabitEthernet0/0, add, 10.1.1.1/24
+r2, GigabitEthernet0/0, add, 10.1.1.2/24
+r1;r2;r3, Loopback0, description, Link-Uplink
+r3, GigabitEthernet0/1, delete,
+r1;r2,, ssh_port, 2022</pre>
+      <p class="muted small">Separator device: <code>;</code> &nbsp; Separator kolom: <code>,</code></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function openCommandModal() {
+    document.getElementById("commandModal").style.display = "flex";
+  }
+  function closeCommandModal() {
+    document.getElementById("commandModal").style.display = "none";
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var overlay = document.getElementById("commandModal");
+    if (overlay) {
+      overlay.addEventListener("click", function (e) {
+        if (e.target === overlay) closeCommandModal();
+      });
+    }
+    var form = document.getElementById("batchForm");
+    if (form) {
+      form.addEventListener("submit", function () {
+        document.getElementById("execBtn").disabled = true;
+        document.getElementById("execBtn").textContent = "⏳ Executing...";
+      });
+    }
+  });
+</script>
+{% endblock %}

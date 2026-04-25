@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Topology Dashboard</h1>
+  <p class="muted">Daftar perangkat dari inventory. Klik <strong>Open</strong> untuk remote &amp; konfigurasi.</p>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 style="margin:0;">Perangkat Jaringan</h2>
+    <div class="actions">
+      <a class="button secondary" href="{{ url_for('batch') }}">Batch Actions</a>
+    </div>
+  </div>
+
+  {% if inventory %}
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Host / IP</th>
+        <th>Port</th>
+        <th>Type</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for device in inventory %}
+      <tr>
+        <td><strong>{{ device.id }}</strong></td>
+        <td><code>{{ device.host }}</code></td>
+        <td>{{ device.port }}</td>
+        <td>{{ device.device_type }}</td>
+        <td><span class="badge">{{ device.role }}</span></td>
+        <td>
+          {% if device.enabled %}
+          <span class="status-dot green"></span> Aktif
+          {% else %}
+          <span class="status-dot red"></span> Nonaktif
+          {% endif %}
+        </td>
+        <td>
+          <a class="button" href="{{ url_for('device_detail', device_id=device.id) }}">Open →</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Tidak ada perangkat di inventory.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Quick Connect</h2>
+  <p class="muted">Hubungkan ke perangkat yang tidak ada di inventory.</p>
+  <form method="post" action="{{ url_for('quick_connect') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="label">Label</label>
+        <input id="label" name="label" placeholder="Contoh: router-backup">
+      </div>
+      <div class="form-group">
+        <label for="host">IP Address / Domain <span class="required">*</span></label>
+        <input id="host" name="host" placeholder="Contoh: 192.168.1.1" required>
+      </div>
+      <div class="form-group">
+        <label for="port">SSH Port</label>
+        <input id="port" name="port" type="number" value="22" min="1" max="65535">
+      </div>
+      <div class="form-group">
+        <label for="device_type">Device Type</label>
+        <input id="device_type" name="device_type" value="cisco_ios">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="qc_username">SSH Username</label>
+        <input id="qc_username" name="device_username" placeholder="admin" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="qc_password">SSH Password</label>
+        <input id="qc_password" name="device_password" type="password" placeholder="Password SSH" autocomplete="new-password">
+      </div>
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label for="qc_secret">Enable Secret</label>
+        <input id="qc_secret" name="device_secret" type="password" placeholder="Opsional">
+      </div>
+    </div>
+    <div class="actions" style="margin-top:12px;">
+      <button type="submit">Connect</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

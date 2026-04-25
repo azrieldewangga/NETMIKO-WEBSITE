@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ title }}</h1>
+    <p class="muted">
+      Host: <code>{{ device.host }}</code>:{{ device.port }} &nbsp;|&nbsp; Type: {{ device.device_type }}
+      &nbsp;|&nbsp;
+      {% if connected %}
+      <span class="status-dot green"></span> Terhubung
+      {% elif error %}
+      <span class="status-dot red"></span> Gagal terhubung
+      {% else %}
+      <span class="status-dot grey"></span> Belum terhubung
+      {% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    <a class="button secondary small" href="{{ url_for('dashboard') }}">← Back</a>
+  </div>
+</div>
+
+<div class="grid">
+  <!-- Kiri: Kredensial & Form Aksi -->
+  <div class="card">
+    <h3>Kredensial & Konfigurasi</h3>
+    <form method="post" action="{{ form_action }}" id="actionForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="host" value="{{ device.host }}">
+      <input type="hidden" name="port" value="{{ device.port }}">
+      <input type="hidden" name="device_type" value="{{ device.device_type }}">
+
+      {% if not has_saved_creds %}
+      <div class="form-row">
+        <div class="form-group">
+          <label for="device_username">Username</label>
+          <input id="device_username" name="device_username" value="{{ default_device_username }}" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="device_password">Password <span class="required">*</span></label>
+          <input id="device_password" name="device_password" type="password" placeholder="Password SSH perangkat" autocomplete="new-password" required>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label for="device_secret">Enable Secret</label>
+          <input id="device_secret" name="device_secret" type="password" placeholder="Opsional">
+        </div>
+      </div>
+      {% else %}
+      <p class="muted small">
+        Menggunakan kredensial tersimpan untuk <strong>{{ device.id }}</strong>.
+        <button type="button" class="link-btn" onclick="toggleCredForm()">Ubah?</button>
+      </p>
+      <div id="credForm" style="display:none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="device_username">Username</label>
+            <input id="device_username" name="device_username" value="{{ default_device_username }}" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="device_password">Password Baru</label>
+            <input id="device_password" name="device_password" type="password" placeholder="Kosong = pakai tersimpan" autocomplete="new-password">
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label for="device_secret">Enable Secret</label>
+            <input id="device_secret" name="device_secret" type="password" placeholder="Opsional">
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <hr style="margin:20px 0;">
+
+      <h3>Konfigurasi Interface</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="interface">Interface</label>
+          <select id="interface" name="interface">
+            <option value="">-- pilih interface --</option>
+            {% for row in interfaces %}
+            <option value="{{ row.interface }}">{{ row.interface }} | {{ row.ip_address }} | {{ row.status }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="action">Action</label>
+          <select id="action" name="action" onchange="checkDestructive(this)">
+            <option value="">-- pilih aksi --</option>
+            <option value="add">Add IP</option>
+            <option value="change">Change IP</option>
+            <option value="delete">Delete IP</option>
+            <option value="description">Change Description</option>
+            <option value="ssh_port">Change SSH Port</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label for="value">Value</label>
+          <input id="value" name="value" placeholder="192.168.10.1/24 atau teks deskripsi">
+          <div class="muted small">Tanpa prefix → otomatis /24</div>
+        </div>
+      </div>
+
+      <!-- Bagian konfirmasi buat aksi yang merusak -->
+      <div id="confirmSection" style="display:none;" class="confirm-box">
+        <strong>⚠ Konfirmasi Diperlukan</strong>
+        <p>Aksi <span id="confirmActionLabel" class="highlight"></span> bersifat merusak dan tidak bisa dibatalkan.
+          Lanjutkan?</p>
+        <label class="checkbox-label">
+          <input type="checkbox" id="confirmCheck" onchange="toggleConfirmBtn(this)">
+          Ya, saya yakin ingin melanjutkan.
+        </label>
+        <input type="hidden" name="confirmed" id="confirmedInput" value="0">
+      </div>
+
+      {% if error %}
+      <div class="alert error">{{ error }}</div>
+      {% endif %}
+
+      <div class="actions" style="margin-top:16px;">
+        <button type="submit" id="applyBtn">Apply</button>
+      </div>
+    </form>
+
+    {% if action_result %}
+    <div class="card result-card" style="margin-top:16px;">
+      <h3>✅ Hasil Aksi</h3>
+      <pre>{{ action_result | tojson(indent=2) }}</pre>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Kanan: Ringkasan Interface -->
+  <div class="card">
+    <h3>Interface Summary</h3>
+    <div id="loadingSpinner" style="display:none;" class="spinner-wrapper">
+      <div class="spinner"></div>
+      <p>Menghubungkan ke perangkat...</p>
+    </div>
+
+    {% if not connected and not error %}
+    <p class="muted">Isi kredensial SSH dan submit untuk melihat interfaces.</p>
+    {% elif error %}
+    <div class="alert error">{{ error }}</div>
+    {% elif interfaces %}
+    <table>
+      <thead>
+        <tr>
+          <th>Interface</th>
+          <th>IP Address</th>
+          <th>Status</th>
+          <th>Protocol</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in interfaces %}
+        <tr>
+          <td><code>{{ row.interface }}</code></td>
+          <td>{{ row.ip_address }}</td>
+          <td>
+            {% if "up" in row.status.lower() %}
+            <span class="status-dot green"></span> {{ row.status }}
+            {% else %}
+            <span class="status-dot red"></span> {{ row.status }}
+            {% endif %}
+          </td>
+          <td>{{ row.protocol }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">Tidak ada interface yang ditemukan.</p>
+    {% endif %}
+
+    {% if raw_output %}
+    <details style="margin-top:16px;">
+      <summary class="muted">Raw Output CLI</summary>
+      <pre style="margin-top:8px;">{{ raw_output }}</pre>
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Dialog Konfirmasi (buat pending_action) -->
+{% if pending_action %}
+<div id="pendingConfirmModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>⚠ Konfirmasi Aksi Merusak</h3>
+    </div>
+    <p>Anda akan menjalankan aksi <strong>{{ pending_action.action }}</strong> pada interface <strong>{{
+        pending_action.interface }}</strong>.</p>
+    {% if pending_action.value %}<p>Value: <code>{{ pending_action.value }}</code></p>{% endif %}
+    <p class="muted">Tindakan ini tidak dapat dibatalkan. Pastikan Anda tidak menghapus IP Uplink utama yang dipakai
+      untuk remote.</p>
+    <form method="post" action="{{ form_action }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="host" value="{{ device.host }}">
+      <input type="hidden" name="port" value="{{ device.port }}">
+      <input type="hidden" name="device_type" value="{{ device.device_type }}">
+      <input type="hidden" name="action" value="{{ pending_action.action }}">
+      <input type="hidden" name="interface" value="{{ pending_action.interface }}">
+      <input type="hidden" name="value" value="{{ pending_action.value }}">
+      <input type="hidden" name="confirmed" value="1">
+      <div class="actions">
+        <button type="submit" class="danger">Ya, Lanjutkan</button>
+        <a class="button secondary" href="{{ request.url }}">Batal</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modal Referensi Command -->
+<div id="commandModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <h3>📋 Command Reference</h3>
+      <button class="modal-close" onclick="closeCommandModal()">✕</button>
+    </div>
+    <div class="modal-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Aliases</th>
+            <th>Value</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>add</code></td>
+            <td><code>change</code>, <code>set</code>, <code>ip</code></td>
+            <td><code>192.168.1.1/24</code></td>
+            <td>Menambahkan / mengubah IP Address interface. Jika tanpa prefix, sistem pakai /24.</td>
+          </tr>
+          <tr>
+            <td><code>delete</code></td>
+            <td><code>remove</code>, <code>unset</code></td>
+            <td>—</td>
+            <td>Menghapus IP Address dari interface (⚠ Konfirmasi diperlukan).</td>
+          </tr>
+          <tr>
+            <td><code>description</code></td>
+            <td><code>desc</code>, <code>label</code></td>
+            <td>Teks bebas</td>
+            <td>Mengubah deskripsi/label interface.</td>
+          </tr>
+          <tr>
+            <td><code>ssh_port</code></td>
+            <td>—</td>
+            <td><code>Port Number (1-65535)</code></td>
+            <td>Ubah SSH port router. Interface dapat dibiarkan kosong.</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 style="margin-top:20px;">Format Batch</h4>
+      <pre>device1;device2, GigabitEthernet0/0, add, 10.1.1.1/24
+r1;r2;r3, Loopback0, description, Link-Uplink
+r1, FastEthernet0/1, delete,
+r1, , ssh_port, 2022</pre>
+      <p class="muted small">Karakter yang <strong>DIBLOKIR</strong> (keamanan CLI injection):
+        <code>\n \r | ; &amp; ` $</code>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var DESTRUCTIVE = ["delete", "remove", "unset", "change", "ssh_port"];
+
+  function checkDestructive(select) {
+    var action = select.value.toLowerCase();
+    var confirmSection = document.getElementById("confirmSection");
+    var confirmActionLabel = document.getElementById("confirmActionLabel");
+    var applyBtn = document.getElementById("applyBtn");
+    var confirmedInput = document.getElementById("confirmedInput");
+
+    if (DESTRUCTIVE.includes(action)) {
+      confirmActionLabel.textContent = action.toUpperCase();
+      confirmSection.style.display = "block";
+      applyBtn.disabled = true;
+      confirmedInput.value = "0";
+    } else {
+      confirmSection.style.display = "none";
+      applyBtn.disabled = false;
+      confirmedInput.value = "1"; // gak merusak, otomatis ke-konfirmasi
+    }
+  }
+
+  function toggleConfirmBtn(checkbox) {
+    var applyBtn = document.getElementById("applyBtn");
+    var confirmedInput = document.getElementById("confirmedInput");
+    if (checkbox.checked) {
+      applyBtn.disabled = false;
+      confirmedInput.value = "1";
+    } else {
+      applyBtn.disabled = true;
+      confirmedInput.value = "0";
+    }
+  }
+
+  function toggleCredForm() {
+    var form = document.getElementById("credForm");
+    form.style.display = form.style.display === "none" ? "block" : "none";
+  }
+
+  function openCommandModal() {
+    document.getElementById("commandModal").style.display = "flex";
+  }
+  function closeCommandModal() {
+    document.getElementById("commandModal").style.display = "none";
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    var overlay = document.getElementById("commandModal");
+    if (overlay) {
+      overlay.addEventListener("click", function (e) {
+        if (e.target === overlay) closeCommandModal();
+      });
+    }
+
+    // Tunjukin spinner pas form di-submit
+    var form = document.getElementById("actionForm");
+    if (form) {
+      form.addEventListener("submit", function () {
+        document.getElementById("loadingSpinner").style.display = "flex";
+      });
+    }
+  });
+</script>
+{% endblock %}

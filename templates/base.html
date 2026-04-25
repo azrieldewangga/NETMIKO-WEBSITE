@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="id">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{{ title or "Topology Panel" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=2">
+  <!-- CSS buat Toastify -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    integrity="sha384-GSJP6bR4yv1SbLGhL+ntxb4LDi6RC5j8eM8OAh5lwPYdvj9cflIWJiFZdAFr2gyP"
+    crossorigin="anonymous">
+</head>
+
+<body>
+  <div class="nav">
+    <div>
+      <strong>Topology Panel</strong>
+    </div>
+    <div class="nav-links">
+      {% if session.get("logged_in") %}
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('batch') }}">Batch</a>
+      <button class="button secondary small" onclick="openSettingsModal()">Credentials</button>
+      <a href="{{ url_for('logout') }}">Logout</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Modal Kredensial SSH Global (buat Batch) -->
+  {% if session.get("logged_in") %}
+  <div id="settingsModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Global SSH Credentials</h3>
+        <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+      </div>
+      <p class="muted">Digunakan oleh fitur Batch Actions. Per-router pakai form di halaman masing-masing device.</p>
+      <form method="post" action="{{ url_for('save_global_credentials') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="g_username">SSH Username</label>
+        <input id="g_username" name="device_username" value="{{ session.get('global_username', '') }}"
+          autocomplete="off">
+        <label for="g_password">SSH Password</label>
+        <input id="g_password" name="device_password" type="password" placeholder="Isi untuk memperbarui..."
+          autocomplete="new-password">
+        <label for="g_secret">Enable Secret</label>
+        <input id="g_secret" name="device_secret" type="password" placeholder="Opsional">
+        <div class="actions" style="margin-top:16px;">
+          <button type="submit">Simpan</button>
+          <button type="button" class="secondary" onclick="closeSettingsModal()">Batal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="container">
+    <!-- Pesen Flash ditampilin jadi Toast lewat JS -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        {% for category, message in messages %}
+        showToast({{ message | tojson }}, {{ category | tojson }});
+      {% endfor %}
+          });
+    </script>
+    {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- JS buat Toastify -->
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"
+    integrity="sha384-1ypXlohFqSnDLddhnZiShX//tfF/8DnI48Om/a4duN13pHb1ptyRaxBONqaAb61d"
+    crossorigin="anonymous"></script>
+  <script>
+    function showToast(message, category) {
+      var colors = {
+        success: "#22c55e",
+        error: "#ef4444",
+        warning: "#f59e0b",
+        info: "#3b82f6"
+      };
+      Toastify({
+        text: message,
+        duration: 5000,
+        close: true,
+        gravity: "bottom",
+        position: "right",
+        style: { background: colors[category] || colors.info, borderRadius: "8px", fontWeight: "500" },
+      }).showToast();
+    }
+
+    function openSettingsModal() {
+      document.getElementById("settingsModal").style.display = "flex";
+    }
+    function closeSettingsModal() {
+      document.getElementById("settingsModal").style.display = "none";
+    }
+    // Tutup modal kalo ngetap di luar area modal
+    document.addEventListener("DOMContentLoaded", function () {
+      var overlay = document.getElementById("settingsModal");
+      if (overlay) {
+        overlay.addEventListener("click", function (e) {
+          if (e.target === overlay) closeSettingsModal();
+        });
+      }
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+
+</html>

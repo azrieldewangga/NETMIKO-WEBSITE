@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card login-card">
+  <h1>Login</h1>
+  <p class="muted">Masuk untuk membuka panel otomasi jaringan.</p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required>
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+    <div style="margin-top: 20px;">
+      <button type="submit" style="width:100%;">Masuk →</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
