@@ -18,10 +18,10 @@
 {% endblock %}
 
 {% block content %}
-{# role → css class helper #}
+{# Map role device ke CSS class untuk warna badge yang berbeda #}
 {% set rc_map = {'router':'router','switch':'switch','firewall':'firewall','server':'server'} %}
 
-<!-- Breadcrumb -->
+<!-- Breadcrumb: penanda posisi halaman saat ini -->
 <div class="breadcrumb">
   <a href="{{ url_for('dashboard') }}">Overview</a>
   <span class="breadcrumb-sep">/</span>
@@ -36,7 +36,7 @@
   </div>
 </div>
 
-<!-- ── FULL-WIDTH: Batch Configuration card (moved to top, was left column) ── -->
+<!-- ── BATCH CONFIG CARD: Form utama untuk input perintah batch ── -->
 <div class="card" style="margin-bottom:20px;">
   <div class="card-header">
     <div>
@@ -53,7 +53,8 @@
   <form method="post" id="batchForm">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    <!-- SSH Credentials (collapsible) — same fields as before -->
+    <!-- Kredensial SSH bisa dilipat/dikembangkan (details/summary),
+         otomatis terbuka kalau belum ada password tersimpan di session -->
     <details {% if not session.get('global_password') %}open{% endif %} style="margin-bottom:16px;">
       <summary>Kredensial SSH</summary>
       <p class="muted small" style="margin:6px 0 12px;">Opsional jika sudah di-set via SSH Credentials di sidebar.</p>
@@ -86,7 +87,7 @@
       placeholder="r1, GigabitEthernet0/0, add, 192.168.10.1/24&#10;r1;r2, Loopback0, description, ke-upstream">{% if batch_rows %}{% for r in batch_rows %}{{ r.device_ids | join(';') }},{{ r.interface }},{{ r.action }},{{ r.value }}
 {% endfor %}{% endif %}</textarea>
 
-    <!-- Execute button right-aligned (was left-aligned before) -->
+    <!-- Tombol Execute diletakkan kanan — trigger POST batch form -->
     <div class="actions actions-end" style="margin-top:16px;">
       <button type="submit" id="execBtn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -96,11 +97,10 @@
   </form>
 </div>
 
-<!-- ── BOTTOM TWO COLUMNS: Inventory (left) | Results (right) ── -->
-<!-- This is the structural change: inventory moved from right to left, results to right -->
+<!-- ── DUA KOLOM DI BAWAH: Inventory (kiri) | Hasil Eksekusi (kanan) ── -->
 <div class="grid-2">
 
-  <!-- LEFT: Inventory (was on the right before) -->
+  <!-- Kolom kiri: daftar device di inventory dengan status enabled/disabled -->
   <div class="card">
     <div class="card-header" style="margin-bottom:14px;">
       <div class="card-title">Inventory</div>
@@ -152,7 +152,7 @@
     {% endif %}
   </div>
 
-  <!-- RIGHT: Results (was mixed into inventory column before) -->
+  <!-- Kolom kanan: hasil eksekusi batch (berhasil & gagal) setelah Execute -->
   <div>
     {% if results %}
     <!-- Successful -->
@@ -239,7 +239,7 @@
 
 </div>
 
-<!-- Command Reference Modal -->
+<!-- Modal Command Reference: tabel referensi perintah batch yang tersedia -->
 <div id="commandModal" class="modal-overlay" style="display:none;">
   <div class="modal-box modal-lg">
     <div class="modal-header">
@@ -300,15 +300,18 @@ r1;r2,, ssh_port, 2022</pre>
 
 {% block scripts %}
 <script>
+  /* Buka/tutup modal Command Reference */
   function openCommandModal()  { document.getElementById("commandModal").style.display = "flex"; }
   function closeCommandModal() { document.getElementById("commandModal").style.display = "none"; }
 
   document.addEventListener("DOMContentLoaded", function () {
+    /* Klik di luar modal → tutup modal */
     var overlay = document.getElementById("commandModal");
     if (overlay) overlay.addEventListener("click", function(e) {
       if (e.target === overlay) closeCommandModal();
     });
 
+    /* Disable tombol Execute dan ganti teks-nya saat form disubmit, biar tidak klik dua kali */
     var form = document.getElementById("batchForm");
     if (form) form.addEventListener("submit", function () {
       var btn = document.getElementById("execBtn");

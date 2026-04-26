@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Breadcrumb -->
+<!-- Breadcrumb: penanda posisi halaman saat ini -->
 <div class="breadcrumb">
   <a href="{{ url_for('dashboard') }}">Overview</a>
   <span class="breadcrumb-sep">/</span>
   <span class="breadcrumb-cur">Profile</span>
 </div>
 
-<!-- Page header -->
+<!-- Header halaman profile -->
 <div class="page-header">
   <div>
     <h1 class="page-title">Profile</h1>
@@ -16,11 +16,11 @@
   </div>
 </div>
 
-<!-- Profile Card -->
+<!-- Profile Card: berisi avatar + field username & password yang bisa diedit inline -->
 <div class="card" style="max-width:600px;">
   <div style="display:flex; gap:32px; align-items:flex-start;">
 
-    <!-- Avatar -->
+    <!-- Avatar: klik untuk upload foto baru, otomatis tampil cropper kalau rasionya bukan 1:1 -->
     <div class="avatar-wrap" id="avatarWrap" title="Klik untuk ganti foto">
       {% if avatar %}
       <img src="{{ url_for('static', filename='uploads/' + avatar) }}"
@@ -45,10 +45,10 @@
       <input type="file" id="avatarInput" accept="image/*" style="display:none;">
     </div>
 
-    <!-- Fields -->
+    <!-- Field editable: username dan password, klik ikon pensil untuk mulai edit -->
     <div class="profile-fields" style="flex:1;">
 
-      <!-- Username -->
+      <!-- Field username: tampil sebagai teks, klik edit untuk ubah -->
       <div class="profile-field" id="row-username">
         <span class="profile-field-label">User</span>
         <span class="profile-field-sep">:</span>
@@ -67,7 +67,7 @@
         </div>
       </div>
 
-      <!-- Password -->
+      <!-- Field password: selalu ditampilkan sebagai titik, klik edit untuk ganti -->
       <div class="profile-field" id="row-password">
         <span class="profile-field-label">Password</span>
         <span class="profile-field-sep">:</span>
@@ -89,7 +89,7 @@
     </div>
   </div>
 
-  <!-- Shared Cancel / Save — appears for field edits OR pending avatar -->
+  <!-- Tombol Cancel & Save: muncul saat ada field yang diedit atau avatar yang pending diupload -->
   <div id="profile-actions" class="actions actions-end"
        style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
     <button type="button" class="secondary" onclick="cancelAll()">Cancel</button>
@@ -97,7 +97,7 @@
   </div>
 </div>
 
-<!-- Crop Modal — only Batal; confirm happens via card Save button -->
+<!-- Modal Crop Foto: muncul saat user upload foto yang bukan rasio 1:1, untuk crop jadi kotak -->
 <div id="cropModal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:500px; width:100%;">
     <div class="modal-header">
@@ -123,14 +123,15 @@
 <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 <script>
   var CSRF_TOKEN  = document.querySelector('meta[name="csrf-token"]').content;
-  var _activeField      = null;   /* which field is being edited */
-  var _cropper          = null;   /* active Cropper instance */
-  var _pendingAvatarBlob = null;  /* cropped/selected blob waiting for Save */
-  var _originalAvatarSrc = null;  /* previous avatar src for revert on Cancel */
+  var _activeField      = null;   /* field mana yang sedang diedit saat ini */
+  var _cropper          = null;   /* instance Cropper.js yang aktif untuk crop foto */
+  var _pendingAvatarBlob = null;  /* blob foto yang sudah dicrop, menunggu diklik Save */
+  var _originalAvatarSrc = null;  /* src avatar lama, untuk revert kalau Cancel */
 
-  /* ────────────────────────────────────────────────────────
-     Field editing
-  ──────────────────────────────────────────────────────── */
+  /* ─────────────────────────────────────────────────────
+     Edit field (username / password) — klik ikon pensil → tampil input
+  ───────────────────────────────────────────────────── */
+  /* startEdit: mulai edit field tertentu; kalau ada field lain yang aktif, collapse dulu */
   function startEdit(field) {
     if (_activeField && _activeField !== field) _collapseField(_activeField);
     _activeField = field;
@@ -143,6 +144,7 @@
     if (field === "password") input.value = "";
   }
 
+  /* _collapseField: kembalikan field ke tampilan read-only, hapus input kalau password */
   function _collapseField(field) {
     document.getElementById("edit-" + field).style.display     = "none";
     document.getElementById("val-" + field).style.display      = "";
@@ -150,6 +152,7 @@
     if (field === "password") document.getElementById("input-password").value = "";
   }
 
+  /* _showActions / _hideActions: kontrol visibilitas baris tombol Cancel & Save */
   function _showActions() {
     document.getElementById("profile-actions").style.display = "flex";
   }
@@ -159,6 +162,7 @@
       document.getElementById("profile-actions").style.display = "none";
   }
 
+  /* cancelAll: batalkan semua perubahan (field & avatar preview) dan kembalikan ke state awal */
   function cancelAll() {
     /* Revert field */
     if (_activeField) { _collapseField(_activeField); _activeField = null; }
@@ -180,6 +184,7 @@
     document.getElementById("profile-actions").style.display = "none";
   }
 
+  /* saveAll: upload avatar dulu (kalau ada), lalu simpan field yang aktif */
   function saveAll() {
     var uploadPromise = _pendingAvatarBlob ? _uploadPending() : Promise.resolve(null);
     uploadPromise.then(function() {
@@ -188,6 +193,7 @@
     });
   }
 
+  /* _saveField: kirim PATCH field ke server via fetch POST, update tampilan kalau berhasil */
   function _saveField(field) {
     var input = document.getElementById("input-" + field);
     var value = input.value.trim();
@@ -215,9 +221,9 @@
     if (e.key === "Escape" && _activeField) cancelAll();
   });
 
-  /* ────────────────────────────────────────────────────────
-     Avatar — select & crop
-  ──────────────────────────────────────────────────────── */
+  /* ─────────────────────────────────────────────────────
+     Avatar — upload & crop
+  ───────────────────────────────────────────────────── */
   var avatarWrap  = document.getElementById("avatarWrap");
   var avatarInput = document.getElementById("avatarInput");
   var cropModal   = document.getElementById("cropModal");
@@ -247,6 +253,8 @@
     reader.readAsDataURL(file);
   });
 
+  /* _openCropModal: buka modal cropper dengan gambar yang baru dipilih;
+     inisialisasi Cropper.js dengan rasio 1:1 */
   function _openCropModal(src) {
     cropModal.style.display = "flex";
     cropImage.src = "";
@@ -270,12 +278,14 @@
     cropImage.src = src;
   }
 
+  /* cancelCrop: tutup modal dan hapus instance cropper */
   function cancelCrop() {
     cropModal.style.display = "none";
     if (_cropper) { _cropper.destroy(); _cropper = null; }
     cropImage.src = "";
   }
 
+  /* confirmCrop: export canvas hasil crop ke blob PNG 512x512, taruh di pending */
   function confirmCrop() {
     if (!_cropper) return;
     _cropper.getCroppedCanvas({ width: 512, height: 512 }).toBlob(function(blob) {
@@ -286,8 +296,9 @@
     }, "image/png");
   }
 
+  /* _setPendingBlob: simpan blob avatar di memori sambil menunggu Save diklik */
   function _setPendingBlob(file) {
-    /* Save current avatar src so Cancel can revert */
+    /* Simpan src avatar lama supaya bisa di-revert kalau Cancel */
     var display = document.getElementById("avatarDisplay");
     if (!_originalAvatarSrc)
       _originalAvatarSrc = display.tagName === "IMG" ? display.src : null;
@@ -295,6 +306,7 @@
     _showActions();
   }
 
+  /* _previewBlob: tampilkan blob hasil crop sebagai preview avatar sebelum diupload */
   function _previewBlob(file) {
     var url = URL.createObjectURL(file);
     var display = document.getElementById("avatarDisplay");
@@ -307,6 +319,8 @@
     display.src = url;
   }
 
+  /* _uploadPending: upload avatar blob ke server via fetch POST,
+     update tampilan avatar di halaman + topbar setelah berhasil */
   function _uploadPending() {
     var file = _pendingAvatarBlob;
     _pendingAvatarBlob = null;
@@ -338,7 +352,7 @@
     }).catch(function() { showToast("Gagal upload foto.", "error"); });
   }
 
-  /* Click outside crop modal */
+  /* Klik di luar modal crop → tutup modal (sama seperti tombol Batal) */
   cropModal.addEventListener("click", function(e) {
     if (e.target === cropModal) cancelCrop();
   });

@@ -18,14 +18,14 @@
 {% endblock %}
 
 {% block content %}
-{# breadcrumb #}
+{# breadcrumb: penanda posisi halaman (Overview > device id) #}
 <div class="breadcrumb">
   <a href="{{ url_for('dashboard') }}">Overview</a>
   <span class="breadcrumb-sep">/</span>
   <span class="breadcrumb-cur">{{ device.id }}</span>
 </div>
 
-{# page header #}
+{# Header halaman: tampilkan nama device, host, port, tipe, dan status koneksi SSH #}
 <div class="page-header">
   <div>
     <h1 class="page-title">{{ title }}</h1>
@@ -44,10 +44,10 @@
   </div>
 </div>
 
-{# ── MAIN GRID: Interface Summary (LEFT) | Config Form (RIGHT) ── #}
+{# LAYOUT DUA KOLOM: Kiri = Interface Summary | Kanan = Form Konfigurasi #}
 <div class="grid-7-5">
 
-  {# ── LEFT: Interface Summary ────────────────────────────────── #}
+  {# Kolom kiri: tampilkan tabel interface dari output 'show ip interface brief' #}
   <div>
     <div class="card">
       <div class="card-header">
@@ -134,7 +134,7 @@
     {% endif %}
   </div>
 
-  {# ── RIGHT: Credentials card + Config card ──────────────────── #}
+  {# Kolom kanan: form kredensial SSH + form pilih aksi interface #}
   <div>
     <form method="post" action="{{ form_action }}" id="actionForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -142,7 +142,8 @@
       <input type="hidden" name="port"        value="{{ device.port }}">
       <input type="hidden" name="device_type" value="{{ device.device_type }}">
 
-      {# ── Credentials card ── #}
+      {# Card kredensial SSH: input username/password.  
+         Kalau sudah ada kredensial tersimpan di session, tampilkan tombol 'Ubah?' #}
       <div class="card">
         <div class="card-header" style="margin-bottom:10px;">
           <div class="card-title">
@@ -194,7 +195,7 @@
         {% endif %}
       </div>
 
-      {# ── Interface Config card ── #}
+      {# Card konfigurasi interface: pilih interface, action, dan value lalu Apply #}
       <div class="card" style="margin-top:14px;">
         <div class="card-header" style="margin-bottom:10px;">
           <div class="card-title">
@@ -236,7 +237,7 @@
           <div class="form-hint">Tanpa prefix → otomatis /24</div>
         </div>
 
-        {# Destructive confirmation box #}
+        {# Kotak konfirmasi muncul kalau action yang dipilih bersifat destruktif (delete/change/ssh_port) #}
         <div id="confirmSection" style="display:none;" class="confirm-box">
           <p style="font-size:13px; font-weight:600; color:var(--warning); margin-bottom:8px; margin-top:0; display:flex; align-items:center; gap:6px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -257,7 +258,7 @@
         <div class="alert error" style="margin-top:12px;">{{ error }}</div>
         {% endif %}
 
-        {# Apply button — right-aligned (different from old left-aligned) #}
+        {# Tombol Apply di kanan #}
         <div class="actions actions-end" style="margin-top:16px;">
           <button type="submit" id="applyBtn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -273,7 +274,7 @@
 
 </div>{# end grid #}
 
-{# ── Pending action confirmation modal ─────────────────────── #}
+{# Modal konfirmasi aksi destruktif: hanya muncul kalau server mendeteksi perlu konfirmasi ulang #}
 {% if pending_action %}
 <div id="pendingConfirmModal" class="modal-overlay">
   <div class="modal-box">
@@ -314,7 +315,7 @@
 </div>
 {% endif %}
 
-{# ── Command Reference Modal ────────────────────────────────── #}
+{# Modal referensi perintah: diakses dari tombol 'Referensi CMD' di sidebar #}
 <div id="commandModal" class="modal-overlay" style="display:none;">
   <div class="modal-box modal-lg">
     <div class="modal-header">
@@ -376,8 +377,10 @@ r1, , ssh_port, 2022</pre>
 
 {% block scripts %}
 <script>
+  /* Daftar action yang dianggap destruktif dan butuh konfirmasi checkbox dulu */
   var DESTRUCTIVE = ["delete", "remove", "unset", "change", "ssh_port"];
 
+  /* checkDestructive: cek pilihan action di dropdown, tampilkan/sembunyikan kotak konfirmasi */
   function checkDestructive(select) {
     var action          = select.value.toLowerCase();
     var confirmSection  = document.getElementById("confirmSection");
@@ -397,6 +400,7 @@ r1, , ssh_port, 2022</pre>
     }
   }
 
+  /* toggleConfirmBtn: aktifkan/nonaktifkan tombol Apply berdasarkan status checkbox konfirmasi */
   function toggleConfirmBtn(checkbox) {
     var applyBtn       = document.getElementById("applyBtn");
     var confirmedInput = document.getElementById("confirmedInput");
@@ -404,20 +408,24 @@ r1, , ssh_port, 2022</pre>
     confirmedInput.value = checkbox.checked ? "1" : "0";
   }
 
+  /* toggleCredForm: tampilkan/sembunyikan form ubah kredensial yang sudah tersimpan */
   function toggleCredForm() {
     var f = document.getElementById("credForm");
     f.style.display = f.style.display === "none" ? "block" : "none";
   }
 
+  /* Buka/tutup modal Command Reference */
   function openCommandModal()  { document.getElementById("commandModal").style.display = "flex"; }
   function closeCommandModal() { document.getElementById("commandModal").style.display = "none"; }
 
   document.addEventListener("DOMContentLoaded", function () {
+    /* Klik di luar modal → tutup Command Reference modal */
     var cmdOverlay = document.getElementById("commandModal");
     if (cmdOverlay) cmdOverlay.addEventListener("click", function(e) {
       if (e.target === cmdOverlay) closeCommandModal();
     });
 
+    /* Tampilkan spinner loading saat form disubmit (koneksi SSH bisa lama) */
     var form = document.getElementById("actionForm");
     if (form) form.addEventListener("submit", function () {
       document.getElementById("loadingSpinner").style.display = "flex";

@@ -17,18 +17,24 @@ LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 
 
+# ── Custom Exceptions ─────────────────────────────────────────────────────────
+
 class InventoryError(ValueError):
+    """Error yang dilempar kalau ada masalah di inventory (format salah, device tidak ditemukan, dll)."""
     pass
 
 
 class ConnectionError(RuntimeError):
+    """Error yang dilempar kalau koneksi SSH ke device gagal."""
     pass
 
 
 class ActionError(RuntimeError):
+    """Error yang dilempar kalau aksi konfigurasi ke device gagal atau tidak valid."""
     pass
 
 
+# Daftar exception dari library Netmiko yang akan kita tangkap
 NETMIKO_EXCEPTIONS = (
     NetMikoTimeoutException,
     NetMikoAuthenticationException,
@@ -36,17 +42,22 @@ NETMIKO_EXCEPTIONS = (
 
 # ── Bantuan Keamanan ──────────────────────────────────────────────────────────
 
-_DANGEROUS_CHARS = re.compile(r"[\r\n\x00-\x1f\x7f|;&`$]")  # cegah injeksi CLI
+# Regex untuk nangkep karakter berbahaya yang bisa bikin CLI injection
+_DANGEROUS_CHARS = re.compile(r"[\r\n\x00-\x1f\x7f|;&`$]")
 
 
 def sanitize_cli_value(value: str) -> str:
-    """Buang karakter yang berpotensi bikin injeksi CLI Cisco."""
+    """
+    Bersiin value dari karakter berbahaya sebelum dikirim ke CLI Cisco.
+    Kalau panjangnya lebih dari 200 karakter, langsung tolak.
+    """
     cleaned = _DANGEROUS_CHARS.sub("", value).strip()
     if len(cleaned) > 200:
         raise ActionError("Value terlalu panjang (maks 200 karakter).")
     return cleaned
 
 
+# Pola error dari output CLI Cisco yang perlu kita deteksi
 ERROR_PATTERNS = (
     re.compile(r"bad mask", re.IGNORECASE),
     re.compile(r"invalid input", re.IGNORECASE),
@@ -57,7 +68,7 @@ ERROR_PATTERNS = (
 )
 
 
-# Whitelist device_type yang didukung Netmiko
+# Daftar device_type yang didukung Netmiko (whitelist)
 ALLOWED_DEVICE_TYPES = {
     "cisco_ios", "cisco_xe", "cisco_xr", "cisco_nxos", "cisco_asa",
     "arista_eos", "juniper_junos", "huawei", "mikrotik_routeros",
@@ -66,7 +77,10 @@ ALLOWED_DEVICE_TYPES = {
 
 
 def _validate_host(host: str, device_id: str) -> None:
-    """Validasi format IP address atau hostname."""
+    """
+    Validasi format host — boleh berupa IP address atau hostname yang valid.
+    Kalau formatnya salah, lempar InventoryError.
+    """
     try:
         ipaddress.ip_address(host)
         return
@@ -80,7 +94,10 @@ def _validate_host(host: str, device_id: str) -> None:
 
 
 def _parse_device_list(raw_list: list) -> list[dict[str, Any]]:
-    """Parse and validate a list of device dicts."""
+    """
+    Parse dan validasi list device dari inventory JSON.
+    Setiap item dicek: harus punya id, host valid, port 1-65535, dan device_type yang dikenali.
+    """
     devices: list[dict[str, Any]] = []
     for item in raw_list:
         if not isinstance(item, dict):
@@ -123,12 +140,15 @@ def _parse_device_list(raw_list: list) -> list[dict[str, Any]]:
 
 
 def load_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> dict[str, Any]:
-    """Load inventory from JSON. Supports both legacy list format and new dict format."""
+    """
+    Load inventory dari file JSON.
+    Support dua format: list lama (auto-migrate ke dict baru) dan dict baru lengkap dengan links & switch.
+    """
     inventory_path = Path(path)
     with inventory_path.open() as handle:
         raw = json.load(handle)
 
-    # Auto-migrate: jika format lama (list), konversi ke dict baru
+    # Auto-migrate: kalau format lama (list), konversi ke format dict baru
     if isinstance(raw, list):
         devices = _parse_device_list(raw)
         return {
@@ -152,12 +172,18 @@ def load_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> dict[str, Any]:
 
 
 def load_inventory_devices(path: str | Path = DEFAULT_INVENTORY_PATH) -> list[dict[str, Any]]:
-    """Convenience: return only the devices list (backward compat helper)."""
+    """
+    Shortcut: load inventory tapi langsung return list devices-nya aja.
+    Cocok dipakai kalau hanya butuh daftar device tanpa info links dan switch.
+    """
     return load_inventory(path)["devices"]
 
 
 def _load_raw_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> dict:
-    """Load raw JSON and normalise to dict format."""
+    """
+    Load JSON mentah dari file inventory dan normalisasi ke format dict.
+    Digunakan internal untuk operasi baca-tulis langsung ke file.
+    """
     inventory_path = Path(path)
     with inventory_path.open() as handle:
         raw = json.load(handle)
@@ -167,12 +193,21 @@ def _load_raw_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> dict:
 
 
 def _save_raw_inventory(data: dict, path: str | Path = DEFAULT_INVENTORY_PATH) -> None:
+    """
+    Simpan dict inventory ke file JSON dengan indentasi 2 spasi.
+    Dipanggil setelah ada perubahan data (tambah/update device).
+    """
     inventory_path = Path(path)
     with inventory_path.open("w") as handle:
         json.dump(data, handle, indent=2)
 
 
 def update_inventory_device(device_id: str, updates: dict[str, Any], path: str | Path = DEFAULT_INVENTORY_PATH) -> None:
+    """
+    Update field tertentu dari device yang sudah ada di inventory.
+    Cari device berdasarkan id, lalu update field-nya dan simpan kembali ke file.
+    Kalau device tidak ditemukan, lempar InventoryError.
+    """
     raw = _load_raw_inventory(path)
     updated = False
     for item in raw["devices"]:
@@ -192,7 +227,11 @@ def add_device_to_inventory(
     link_data: dict[str, Any] | None = None,
     path: str | Path = DEFAULT_INVENTORY_PATH,
 ) -> None:
-    """Add a new device (and optionally a link) to the inventory file."""
+    """
+    Tambah device baru ke inventory JSON.
+    Opsional: sekalian tambah data link (koneksi ke switch/device lain).
+    Kalau id device sudah ada, lempar InventoryError (tidak boleh duplikat).
+    """
     raw = _load_raw_inventory(path)
 
     device_id = str(device_data.get("id", "")).strip()
@@ -203,7 +242,7 @@ def add_device_to_inventory(
         raise InventoryError("Host / IP address is required.")
     _validate_host(host, device_id)
 
-    # Cek duplikat
+    # Cek duplikat — id harus unik
     for existing in raw["devices"]:
         if str(existing.get("id", "")).strip() == device_id:
             raise InventoryError(f"Device '{device_id}' already exists in inventory.")
@@ -226,6 +265,7 @@ def add_device_to_inventory(
     }
     raw["devices"].append(new_device)
 
+    # Kalau ada data link, tambahkan juga ke inventory
     if link_data:
         raw.setdefault("links", []).append(link_data)
 
@@ -233,6 +273,10 @@ def add_device_to_inventory(
 
 
 def find_device(inventory: list[dict[str, Any]], lookup: str) -> dict[str, Any]:
+    """
+    Cari device di inventory berdasarkan id, name, atau host (case-insensitive).
+    Kalau tidak ketemu, lempar InventoryError.
+    """
     normalized = lookup.strip().lower()
     for device in inventory:
         candidates = {
@@ -254,6 +298,10 @@ def build_connection_params(
     port: int | str | None = None,
     device_type: str | None = None,
 ) -> dict[str, Any]:
+    """
+    Buat dict parameter koneksi yang siap dipakai oleh Netmiko ConnectHandler.
+    Secara otomatis set session_log ke folder logs/ dengan timestamp.
+    """
     device_id = device.get("id", "unknown")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     params = {
@@ -279,6 +327,10 @@ def connect_device(
     port: int | str | None = None,
     device_type: str | None = None,
 ):
+    """
+    Buka koneksi SSH ke device via Netmiko.
+    Kalau gagal (timeout atau autentikasi salah), lempar ConnectionError.
+    """
     params = build_connection_params(device, username, password, secret, host, port, device_type)
     try:
         return netmiko.ConnectHandler(**params)
@@ -294,8 +346,8 @@ def check_device_reachable(
     timeout: int = 5,
 ) -> str:
     """
-    Check apakah device benar-benar bisa diakses via SSH.
-    Return: 'online', 'offline', atau 'unknown'
+    Cek apakah device bisa dijangkau via SSH dengan mencoba buka koneksi singkat.
+    Return: 'online' kalau sukses, 'offline' kalau timeout/auth gagal, 'unknown' kalau error lain.
     """
     try:
         params = {
@@ -306,7 +358,7 @@ def check_device_reachable(
             "password": password,
             "timeout": timeout,
             "banner_timeout": timeout,
-            "auth_timeout": timeout,  # ← kunci: default Netmiko = 10s, wajib di-set!
+            "auth_timeout": timeout,  # penting! default Netmiko = 10s, wajib di-set biar tidak lama
         }
         if secret:
             params["secret"] = secret
@@ -321,7 +373,10 @@ def check_device_reachable(
 
 
 def _normalize_textfsm_row(row: dict[str, str]) -> dict[str, str]:
-    """Normalisasi key dari NTC Templates ke format yang dipakai views."""
+    """
+    Normalisasi key dari hasil parsing NTC Templates ke format yang dipakai oleh views.
+    Menangani variasi nama key yang berbeda antar template.
+    """
     return {
         "interface": row.get("intf") or row.get("interface") or "",
         "ip_address": row.get("ipaddr") or row.get("ipaddress") or row.get("ip_address") or "unassigned",
@@ -332,7 +387,10 @@ def _normalize_textfsm_row(row: dict[str, str]) -> dict[str, str]:
 
 
 def _parse_interface_brief_fallback(output: str) -> list[dict[str, str]]:
-    """Fallback parser kalau TextFSM gagal (misal template tidak ditemukan)."""
+    """
+    Parser manual untuk output 'show ip interface brief' kalau TextFSM gagal.
+    Parsing dilakukan baris per baris, skip header dan baris kosong.
+    """
     rows: list[dict[str, str]] = []
     started = False
     for raw_line in output.splitlines():
@@ -370,6 +428,11 @@ def get_interface_summary(
     port: int | str | None = None,
     device_type: str | None = None,
 ) -> tuple[list[dict[str, str]], str]:
+    """
+    Ambil daftar interface dari device via SSH menggunakan 'show ip interface brief'.
+    Coba parsing pakai TextFSM dulu; kalau gagal, fallback ke parser manual.
+    Return: (list interface terstruktur, raw output CLI).
+    """
     connection = connect_device(device, username, password, secret, host, port, device_type)
     try:
         # Coba TextFSM dulu untuk structured data otomatis
@@ -396,6 +459,10 @@ def get_device_snapshot(
     port: int | str | None = None,
     device_type: str | None = None,
 ) -> dict[str, Any]:
+    """
+    Ambil snapshot lengkap satu device: info dasar + daftar interface.
+    Kalau koneksi gagal, status reachable=False dan error dicatat di field 'error'.
+    """
     snapshot = {
         "id": device["id"],
         "name": device["name"],
@@ -435,6 +502,10 @@ def get_topology_snapshot(
     password: str,
     secret: str | None = None,
 ) -> list[dict[str, Any]]:
+    """
+    Ambil snapshot semua device yang aktif (enabled=True) di inventory secara berurutan.
+    Return: list snapshot tiap device.
+    """
     return [
         get_device_snapshot(device, username=username, password=password, secret=secret)
         for device in inventory
@@ -443,21 +514,29 @@ def get_topology_snapshot(
 
 
 def build_interface_config(action: str, interface: str, value: str | None = None) -> list[str]:
+    """
+    Generate perintah konfigurasi CLI Cisco berdasarkan action yang diminta.
+    Action yang didukung: add/change/set/ip (set IP), delete/remove/unset (hapus IP),
+    description/desc/label (ubah deskripsi), ssh_port (ubah port SSH).
+    Return: list perintah CLI yang siap dikirim ke device.
+    """
     normalized = action.strip().lower()
-    
+
     if normalized == "ssh_port":
+        # Ubah port SSH router secara global
         if not value or not value.isdigit() or not (1 <= int(value) <= 65535):
             raise ActionError("Value port tidak valid (harus angka 1-65535).")
         return [f"ip ssh port {value}"]
-        
-    # Bersihin nama interface biar aman dari injeksi
+
+    # Bersiin nama interface dari karakter berbahaya
     interface = sanitize_cli_value(interface)
     if normalized in {"add", "change", "set", "ip"}:
+        # Set / ganti IP address di interface
         if not value:
             raise ActionError("CIDR notation is required for add/change actions.")
         normalized_value = sanitize_cli_value(value)
         if "/" not in normalized_value:
-            normalized_value = f"{normalized_value}/24"
+            normalized_value = f"{normalized_value}/24"  # default prefix /24 kalau tidak disebutkan
         interface_value = ipaddress.ip_interface(normalized_value)
         return [
             f"interface {interface}",
@@ -465,8 +544,10 @@ def build_interface_config(action: str, interface: str, value: str | None = None
             " no shutdown",
         ]
     if normalized in {"delete", "remove", "unset"}:
+        # Hapus IP address dari interface
         return [f"interface {interface}", " no ip address"]
     if normalized in {"description", "desc", "label"}:
+        # Ubah deskripsi interface
         if not value:
             raise ActionError("Description text is required for description changes.")
         return [f"interface {interface}", f" description {sanitize_cli_value(value)}"]
@@ -485,10 +566,16 @@ def apply_interface_action(
     port: int | str | None = None,
     device_type: str | None = None,
 ) -> dict[str, Any]:
+    """
+    Eksekusi aksi konfigurasi interface ke device via SSH.
+    Bangun perintah CLI → kirim ke device → cek output error → simpan config.
+    Return: dict hasil eksekusi (device, host, interface, action, output, status).
+    """
     config = build_interface_config(action, interface, value)
     connection = connect_device(device, username, password, secret, host, port, device_type)
     try:
         output = connection.send_config_set(config)
+        # Deteksi pesan error dari output CLI Cisco
         if any(pattern.search(output) for pattern in ERROR_PATTERNS):
             raise ActionError(output.strip())
         save_output = connection.save_config()
@@ -508,12 +595,18 @@ def apply_interface_action(
 
 
 def parse_batch_rows(text: str) -> tuple[list[dict[str, Any]], list[str]]:
+    """
+    Parse teks batch menjadi list baris perintah terstruktur.
+    Format per baris: device1;device2, interface, action, value
+    Baris kosong dan baris komentar (#) diabaikan.
+    Return: (list baris valid, list pesan error format).
+    """
     rows: list[dict[str, Any]] = []
     errors: list[str] = []
     for line_number, raw_line in enumerate(text.splitlines(), start=1):
         line = raw_line.strip()
         if not line or line.startswith("#"):
-            continue
+            continue  # lewati baris kosong dan komentar
 
         parts = [part.strip() for part in line.split(",")]
         if len(parts) < 3:
@@ -552,6 +645,11 @@ def execute_batch(
     password: str,
     secret: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
+    """
+    Jalankan semua baris batch ke device yang sesuai di inventory.
+    Tiap device di tiap baris dieksekusi satu per satu.
+    Return: dict berisi 'successful' (berhasil) dan 'failed' (gagal).
+    """
     results: dict[str, list[dict[str, Any]]] = {"successful": [], "failed": []}
     for row in batch_rows:
         for device_id in row["device_ids"]:

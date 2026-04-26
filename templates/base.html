@@ -1,14 +1,18 @@
 <!doctype html>
 <html lang="id">
 <head>
+  <!-- Charset, viewport, dan CSRF token meta — wajib ada di semua halaman -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{{ title or "NetPanel" }}</title>
+  <!-- Google Fonts: Inter untuk UI, JetBrains Mono untuk output CLI -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Stylesheet utama aplikasi -->
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=4">
+  <!-- CSS Toastify untuk notifikasi pop-up -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
     integrity="sha384-GSJP6bR4yv1SbLGhL+ntxb4LDi6RC5j8eM8OAh5lwPYdvj9cflIWJiFZdAFr2gyP"
     crossorigin="anonymous">
@@ -16,7 +20,7 @@
 <body>
 
 {% if session.get("logged_in") %}
-<!-- ── TOP BAR ─────────────────────────────────────────── -->
+<!-- ── TOP BAR: Hanya tampil kalau sudah login ──────────────────────── -->
 <header class="topbar">
   <div class="topbar-brand">
     <div class="topbar-brand-icon">
@@ -50,7 +54,7 @@
   </div>
 </header>
 
-<!-- ── SIDEBAR ─────────────────────────────────────────── -->
+<!-- ── SIDEBAR: Navigasi utama kiri, tampil saat sudah login ─────────── -->
 <aside class="sidebar" id="sidebar">
 
   <div class="sidebar-search">
@@ -108,7 +112,7 @@
 
 </aside>
 
-<!-- Mobile toggle button -->
+<!-- Tombol hamburger untuk buka/tutup sidebar di mobile -->
 <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle menu">
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
     <line x1="3" y1="6" x2="21" y2="6"/>
@@ -117,7 +121,7 @@
   </svg>
 </button>
 
-<!-- SSH Credentials Modal -->
+<!-- Modal SSH Credentials Global — diisi sekali, dipakai di Batch Actions -->
 <div id="settingsModal" class="modal-overlay" style="display:none;">
   <div class="modal-box">
     <div class="modal-header">
@@ -152,7 +156,7 @@
 </div>
 {% endif %}
 
-<!-- ── MAIN CONTENT ────────────────────────────────────── -->
+<!-- ── MAIN CONTENT: Area konten utama halaman, diisi oleh block content tiap template ── -->
 <main class="main-content">
   <div class="page-wrapper">
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -175,6 +179,8 @@
   integrity="sha384-1ypXlohFqSnDLddhnZiShX//tfF/8DnI48Om/a4duN13pHb1ptyRaxBONqaAb61d"
   crossorigin="anonymous"></script>
 <script>
+  /* showToast: nampilin notifikasi pop-up di pojok kanan bawah
+     - category: 'success' | 'error' | 'warning' | 'info' → warna berbeda */
   function showToast(message, category) {
     var colors = { success: "#107934", error: "#C01717", warning: "#B45309", info: "#0051C3" };
     Toastify({
@@ -187,15 +193,18 @@
     }).showToast();
   }
 
+  /* Buka/tutup modal SSH Credentials Global di sidebar */
   function openSettingsModal()  { document.getElementById("settingsModal").style.display = "flex"; }
   function closeSettingsModal() { document.getElementById("settingsModal").style.display = "none"; }
 
   document.addEventListener("DOMContentLoaded", function () {
+    /* Klik area gelap di luar modal → otomatis tutup modal */
     var overlay = document.getElementById("settingsModal");
     if (overlay) overlay.addEventListener("click", function(e) {
       if (e.target === overlay) closeSettingsModal();
     });
 
+    /* Tombol hamburger toggle sidebar (untuk tampilan mobile) */
     var toggle  = document.getElementById("sidebarToggle");
     var sidebar = document.getElementById("sidebar");
     if (toggle && sidebar) toggle.addEventListener("click", function() {

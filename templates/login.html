@@ -29,7 +29,7 @@
       padding: 32px 16px;
     }
 
-    /* ── LOGO HEADER ───────────────────────────────── */
+    /* ── LOGO HEADER: area logo di atas card login ── */
     .login-header {
       display: flex;
       align-items: center;
@@ -55,7 +55,7 @@
       letter-spacing: -.3px;
     }
 
-    /* ── LOGIN CARD ─────────────────────────────────── */
+    /* ── LOGIN CARD: kotak putih tempat form username & password ── */
     .login-card {
       width: 100%;
       max-width: 400px;
@@ -79,6 +79,7 @@
       margin-bottom: 28px;
     }
 
+    /* Label field form: huruf kecil semua, uppercase via CSS */
     .f-label {
       display: block;
       font-size: 11px;
@@ -94,6 +95,7 @@
       margin-top: 0;
     }
 
+    /* Input text / password di form login */
     .f-input {
       width: 100%;
       padding: 9px 12px;
@@ -116,6 +118,7 @@
       color: #B5B5B5;
     }
 
+    /* Tombol submit login — full width, biru */
     .f-submit {
       width: 100%;
       margin-top: 24px;
@@ -140,7 +143,7 @@
       opacity: .9;
     }
 
-    /* ── FOOTER PILLS ───────────────────────────────── */
+    /* ── FOOTER PILLS: badge kecil di bawah form yang nampilin tech stack ── */
     .login-footer {
       margin-top: 22px;
       padding-top: 18px;
@@ -163,7 +166,7 @@
       color: #6D6D6D;
     }
 
-    /* ── BOTTOM NOTE ────────────────────────────────── */
+    /* ── BOTTOM NOTE: catatan kecil di bagian paling bawah halaman ── */
     .login-note {
       margin-top: 20px;
       font-size: 12px;
@@ -195,7 +198,8 @@
     <h1 class="login-title">Sign in to NetPanel</h1>
     <p class="login-subtitle">Network Automation Panel — Cisco IOS via SSH</p>
 
-    <form method="post">
+    <!-- Form login — kirim POST, server akan cek username & password -->
+  <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <label class="f-label" for="username">Username</label>
@@ -236,9 +240,11 @@
       </span>
     </div>
   </div>
+  <!-- Flash messages dari server disimpan di sini sebagai JSON, lalu dibaca JS -->
   <script id="flashData" type="application/json">{{ get_flashed_messages(with_categories=true) | tojson }}</script>
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
   <script>
+    /* showToast: tampilkan notifikasi pop-up, warna sesuai kategori */
     function showToast(msg, cat) {
       var c = { success: "#107934", error: "#C01717", warning: "#B45309", info: "#0051C3" };
       Toastify({
@@ -247,6 +253,7 @@
       }).showToast();
     }
 
+    /* Saat halaman selesai load, baca flash messages dari server dan tampilkan satu per satu */
     document.addEventListener("DOMContentLoaded", function () {
       var flashData = document.getElementById("flashData");
       if (flashData && flashData.textContent.trim()) {
