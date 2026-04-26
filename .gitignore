@@ -1,0 +1,35 @@
+# Python bytecode and caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test and tooling caches
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local secrets and environment files
+.secret_key
+.env
+.env.*
+!.env.example
+
+# Runtime logs
+logs/*.log
+
+# Local editor or agent config
+.vscode/
+.idea/
+.claude/settings.local.json
+plan.md
+
+# OS files
+Thumbs.db
+.DS_Store

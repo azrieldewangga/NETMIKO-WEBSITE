@@ -1,29 +1,55 @@
-[
-  {
-    "id": "r1",
-    "name": "r1",
-    "host": "192.168.56.11",
-    "port": 22,
-    "device_type": "cisco_ios",
-    "role": "router",
-    "enabled": true
-  },
-  {
-    "id": "r2",
-    "name": "r2",
-    "host": "192.168.56.12",
-    "port": 22,
-    "device_type": "cisco_ios",
-    "role": "router",
-    "enabled": true
-  },
-  {
-    "id": "r3",
-    "name": "r3",
-    "host": "192.168.56.13",
-    "port": 22,
-    "device_type": "cisco_ios",
-    "role": "router",
-    "enabled": true
+{
+  "devices": [
+    {
+      "id": "r1",
+      "name": "r1",
+      "host": "192.168.56.11",
+      "port": 22,
+      "device_type": "cisco_ios",
+      "role": "router",
+      "enabled": true
+    },
+    {
+      "id": "r2",
+      "name": "r2",
+      "host": "192.168.56.12",
+      "port": 22,
+      "device_type": "cisco_ios",
+      "role": "router",
+      "enabled": true
+    },
+    {
+      "id": "r3",
+      "name": "r3",
+      "host": "192.168.56.13",
+      "port": 22,
+      "device_type": "cisco_ios",
+      "role": "router",
+      "enabled": true
+    }
+  ],
+  "links": [
+    {
+      "from": "r1",
+      "from_intf": "Ethernet0/0",
+      "to": "switch",
+      "to_intf": "Ethernet0/1"
+    },
+    {
+      "from": "r2",
+      "from_intf": "Ethernet0/0",
+      "to": "switch",
+      "to_intf": "Ethernet0/2"
+    },
+    {
+      "from": "r3",
+      "from_intf": "Ethernet0/0",
+      "to": "switch",
+      "to_intf": "Ethernet0/3"
+    }
+  ],
+  "switch": {
+    "name": "switch",
+    "host": "192.168.56.1"
   }
-]
+}

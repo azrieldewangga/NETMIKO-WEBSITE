@@ -79,15 +79,10 @@ def _validate_host(host: str, device_id: str) -> None:
         )
 
 
-def load_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> list[dict[str, Any]]:
-    inventory_path = Path(path)
-    with inventory_path.open() as handle:
-        raw = json.load(handle)
-    if not isinstance(raw, list):
-        raise InventoryError("Inventory must be a JSON list.")
-
+def _parse_device_list(raw_list: list) -> list[dict[str, Any]]:
+    """Parse and validate a list of device dicts."""
     devices: list[dict[str, Any]] = []
-    for item in raw:
+    for item in raw_list:
         if not isinstance(item, dict):
             raise InventoryError("Each inventory item must be a JSON object.")
 
@@ -98,17 +93,14 @@ def load_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> list[dict[str, 
         if not host:
             raise InventoryError(f"Device {device_id} needs a host value.")
 
-        # Validasi host
         _validate_host(host, device_id)
 
-        # Validasi port
         port = int(item.get("port") or 22)
         if not (1 <= port <= 65535):
             raise InventoryError(
                 f"Device '{device_id}': port {port} di luar range (1-65535)."
             )
 
-        # Validasi device_type
         device_type = str(item.get("device_type") or "cisco_ios").strip()
         if device_type not in ALLOWED_DEVICE_TYPES:
             raise InventoryError(
@@ -130,24 +122,114 @@ def load_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> list[dict[str, 
     return devices
 
 
-def update_inventory_device(device_id: str, updates: dict[str, Any], path: str | Path = DEFAULT_INVENTORY_PATH) -> None:
+def load_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> dict[str, Any]:
+    """Load inventory from JSON. Supports both legacy list format and new dict format."""
     inventory_path = Path(path)
     with inventory_path.open() as handle:
         raw = json.load(handle)
-        
+
+    # Auto-migrate: jika format lama (list), konversi ke dict baru
+    if isinstance(raw, list):
+        devices = _parse_device_list(raw)
+        return {
+            "devices": devices,
+            "links": [],
+            "switch": {"name": "switch", "host": ""},
+        }
+
+    if not isinstance(raw, dict):
+        raise InventoryError("Inventory must be a JSON list or object.")
+
+    devices = _parse_device_list(raw.get("devices", []))
+    links = raw.get("links", [])
+    switch_info = raw.get("switch", {"name": "switch", "host": ""})
+
+    return {
+        "devices": devices,
+        "links": links,
+        "switch": switch_info,
+    }
+
+
+def load_inventory_devices(path: str | Path = DEFAULT_INVENTORY_PATH) -> list[dict[str, Any]]:
+    """Convenience: return only the devices list (backward compat helper)."""
+    return load_inventory(path)["devices"]
+
+
+def _load_raw_inventory(path: str | Path = DEFAULT_INVENTORY_PATH) -> dict:
+    """Load raw JSON and normalise to dict format."""
+    inventory_path = Path(path)
+    with inventory_path.open() as handle:
+        raw = json.load(handle)
+    if isinstance(raw, list):
+        return {"devices": raw, "links": [], "switch": {"name": "switch", "host": ""}}
+    return raw
+
+
+def _save_raw_inventory(data: dict, path: str | Path = DEFAULT_INVENTORY_PATH) -> None:
+    inventory_path = Path(path)
+    with inventory_path.open("w") as handle:
+        json.dump(data, handle, indent=2)
+
+
+def update_inventory_device(device_id: str, updates: dict[str, Any], path: str | Path = DEFAULT_INVENTORY_PATH) -> None:
+    raw = _load_raw_inventory(path)
     updated = False
-    for item in raw:
+    for item in raw["devices"]:
         current_id = str(item.get("id") or item.get("name") or item.get("host") or "").strip()
         if current_id == device_id:
             item.update(updates)
             updated = True
             break
-            
     if updated:
-        with inventory_path.open("w") as handle:
-            json.dump(raw, handle, indent=4)
+        _save_raw_inventory(raw, path)
     else:
         raise InventoryError(f"Device '{device_id}' was not found in inventory for updating.")
+
+
+def add_device_to_inventory(
+    device_data: dict[str, Any],
+    link_data: dict[str, Any] | None = None,
+    path: str | Path = DEFAULT_INVENTORY_PATH,
+) -> None:
+    """Add a new device (and optionally a link) to the inventory file."""
+    raw = _load_raw_inventory(path)
+
+    device_id = str(device_data.get("id", "")).strip()
+    if not device_id:
+        raise InventoryError("Device ID is required.")
+    host = str(device_data.get("host", "")).strip()
+    if not host:
+        raise InventoryError("Host / IP address is required.")
+    _validate_host(host, device_id)
+
+    # Cek duplikat
+    for existing in raw["devices"]:
+        if str(existing.get("id", "")).strip() == device_id:
+            raise InventoryError(f"Device '{device_id}' already exists in inventory.")
+
+    port = int(device_data.get("port", 22))
+    if not (1 <= port <= 65535):
+        raise InventoryError(f"Port {port} di luar range (1-65535).")
+    device_type = str(device_data.get("device_type", "cisco_ios")).strip()
+    if device_type not in ALLOWED_DEVICE_TYPES:
+        raise InventoryError(f"Device type '{device_type}' tidak dikenali.")
+
+    new_device = {
+        "id": device_id,
+        "name": str(device_data.get("name") or device_id).strip(),
+        "host": host,
+        "port": port,
+        "device_type": device_type,
+        "role": str(device_data.get("role", "router")).strip(),
+        "enabled": bool(device_data.get("enabled", True)),
+    }
+    raw["devices"].append(new_device)
+
+    if link_data:
+        raw.setdefault("links", []).append(link_data)
+
+    _save_raw_inventory(raw, path)
 
 
 def find_device(inventory: list[dict[str, Any]], lookup: str) -> dict[str, Any]:
@@ -202,6 +284,40 @@ def connect_device(
         return netmiko.ConnectHandler(**params)
     except NETMIKO_EXCEPTIONS as exc:
         raise ConnectionError(str(exc)) from exc
+
+
+def check_device_reachable(
+    device: dict[str, Any],
+    username: str = "admin",
+    password: str = "admin",
+    secret: str | None = None,
+    timeout: int = 5,
+) -> str:
+    """
+    Check apakah device benar-benar bisa diakses via SSH.
+    Return: 'online', 'offline', atau 'unknown'
+    """
+    try:
+        params = {
+            "device_type": device["device_type"],
+            "host": device["host"],
+            "port": int(device["port"]),
+            "username": username,
+            "password": password,
+            "timeout": timeout,
+            "banner_timeout": timeout,
+            "auth_timeout": timeout,  # ← kunci: default Netmiko = 10s, wajib di-set!
+        }
+        if secret:
+            params["secret"] = secret
+
+        conn = netmiko.ConnectHandler(**params)
+        conn.disconnect()
+        return "online"
+    except NETMIKO_EXCEPTIONS:
+        return "offline"
+    except Exception:
+        return "unknown"
 
 
 def _normalize_textfsm_row(row: dict[str, str]) -> dict[str, str]:

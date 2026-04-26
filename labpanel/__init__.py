@@ -5,8 +5,9 @@ import os
 import secrets
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, flash, redirect, request, session, url_for
 from flask_talisman import Talisman
+from flask_wtf.csrf import CSRFError
 
 from .extensions import csrf, limiter
 from .routes import register_routes
@@ -18,6 +19,32 @@ PROJECT_DIR = PACKAGE_DIR.parent
 log = logging.getLogger(__name__)
 
 
+def _resolve_secret_key() -> str:
+    """Resolve app secret key from env or local fallback file for dev usage."""
+    env_key = os.environ.get("FLASK_SECRET_KEY", "").strip()
+    if env_key:
+        return env_key
+
+    key_file = PROJECT_DIR / ".secret_key"
+    if key_file.exists():
+        file_key = key_file.read_text(encoding="utf-8").strip()
+        if file_key:
+            log.warning(
+                "FLASK_SECRET_KEY belum di-set; memakai fallback dari .secret_key lokal. "
+                "Set FLASK_SECRET_KEY untuk produksi."
+            )
+            return file_key
+
+    # Generate once and persist so session tetap stabil antar restart di mesin lokal.
+    generated_key = secrets.token_hex(32)
+    key_file.write_text(generated_key, encoding="utf-8")
+    log.warning(
+        "FLASK_SECRET_KEY belum di-set; membuat .secret_key lokal untuk development. "
+        "Set FLASK_SECRET_KEY untuk produksi."
+    )
+    return generated_key
+
+
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(
         __name__,
@@ -26,14 +53,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     )
 
     # ── Secret Key ────────────────────────────────────────────
-    secret_key = os.environ.get("FLASK_SECRET_KEY")
-    if not secret_key:
-        secret_key = secrets.token_hex(32)
-        log.warning(
-            "⚠  FLASK_SECRET_KEY belum di-set! Menggunakan key acak — "
-            "session akan hilang setiap restart. Set env var FLASK_SECRET_KEY "
-            "untuk produksi."
-        )
+    secret_key = _resolve_secret_key()
 
     # ── Cek kredensial default ────────────────────────────────
     web_user = os.environ.get("WEB_USERNAME", "admin")
@@ -86,6 +106,19 @@ def create_app(test_config: dict | None = None) -> Flask:
     )
 
     register_routes(app)
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(exc):
+        # Pulihkan UX ketika form token invalid/stale karena tab lama atau session reset.
+        if request.endpoint == "login" and session.get("logged_in"):
+            return redirect(url_for("dashboard"))
+
+        session.pop("csrf_token", None)
+        flash("Sesi formulir sudah tidak valid. Silakan coba kirim ulang form.", "error")
+        log.warning("CSRF rejected at %s: %s", request.path, exc.description)
+        if request.endpoint == "login":
+            return redirect(url_for("login"))
+        return redirect(request.referrer or (url_for("dashboard") if session.get("logged_in") else url_for("login")))
 
     log.info("Topology Panel started on http://0.0.0.0:5000")
 

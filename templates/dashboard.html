@@ -1,72 +1,474 @@
 {% extends "base.html" %}
 
 {% block content %}
+{# ── compute stats ─────────────────────────────────────────── #}
+{% set online_count = inventory | selectattr('status', 'equalto', 'online') | list | length %}
+{% set type_list = inventory | map(attribute='device_type') | unique | list %}
+{% set type_count = type_list | length %}
+
+{# role → css class helper #}
+{% set rc_map = {'router':'router','switch':'switch','firewall':'firewall','server':'server'} %}
+
+<!-- Page header -->
 <div class="page-header">
-  <h1>Topology Dashboard</h1>
-  <p class="muted">Daftar perangkat dari inventory. Klik <strong>Open</strong> untuk remote &amp; konfigurasi.</p>
+  <div>
+    <h1 class="page-title">Network Devices</h1>
+    <p class="page-subtitle">Kelola perangkat dari inventory. Klik device untuk remote &amp; konfigurasi.</p>
+  </div>
 </div>
 
-<div class="card">
-  <div class="card-header">
-    <h2 style="margin:0;">Perangkat Jaringan</h2>
-    <div class="actions">
-      <a class="button secondary" href="{{ url_for('batch') }}">Batch Actions</a>
+<!-- Stats bar -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="stat-icon blue">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round">
+        <rect x="2" y="2" width="6" height="6" rx="1" />
+        <rect x="16" y="2" width="6" height="6" rx="1" />
+        <rect x="2" y="16" width="6" height="6" rx="1" />
+        <rect x="16" y="16" width="6" height="6" rx="1" />
+        <line x1="8" y1="5" x2="16" y2="5" />
+        <line x1="8" y1="19" x2="16" y2="19" />
+        <line x1="5" y1="8" x2="5" y2="16" />
+        <line x1="19" y1="8" x2="19" y2="16" />
+      </svg>
+    </div>
+    <div>
+      <div class="stat-val">{{ inventory | length }}</div>
+      <div class="stat-lbl">Total Devices</div>
     </div>
   </div>
 
-  {% if inventory %}
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Host / IP</th>
-        <th>Port</th>
-        <th>Type</th>
-        <th>Role</th>
-        <th>Status</th>
-        <th>Aksi</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for device in inventory %}
-      <tr>
-        <td><strong>{{ device.id }}</strong></td>
-        <td><code>{{ device.host }}</code></td>
-        <td>{{ device.port }}</td>
-        <td>{{ device.device_type }}</td>
-        <td><span class="badge">{{ device.role }}</span></td>
-        <td>
-          {% if device.enabled %}
-          <span class="status-dot green"></span> Aktif
-          {% else %}
-          <span class="status-dot red"></span> Nonaktif
-          {% endif %}
-        </td>
-        <td>
-          <a class="button" href="{{ url_for('device_detail', device_id=device.id) }}">Open →</a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="muted">Tidak ada perangkat di inventory.</p>
-  {% endif %}
+  <div class="stat-card">
+    <div class="stat-icon green">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <polyline points="22 4 12 14.01 9 11.01" />
+      </svg>
+    </div>
+    <div>
+      <div class="stat-val">{{ online_count }}</div>
+      <div class="stat-lbl">Online</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon violet">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round">
+        <polyline points="16 18 22 12 16 6" />
+        <polyline points="8 6 2 12 8 18" />
+      </svg>
+    </div>
+    <div>
+      <div class="stat-val">{{ type_count }}</div>
+      <div class="stat-lbl">Device Types</div>
+    </div>
+  </div>
 </div>
 
-<div class="card">
-  <h2>Quick Connect</h2>
-  <p class="muted">Hubungkan ke perangkat yang tidak ada di inventory.</p>
+<!-- Search -->
+<div class="search-wrap">
+  <svg class="search-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+  <input type="text" id="deviceSearch" class="search-inp"
+    placeholder="Cari perangkat berdasarkan nama, IP, atau role...">
+</div>
+
+{% if inventory %}
+<!-- Device cards – horizontal scroll when > 3 -->
+<div class="device-grid" id="deviceGrid" style="display:flex; gap:16px; overflow-x:auto; padding-bottom:8px;">
+  {% for device in inventory %}
+  {% set role_lower = device.role | lower %}
+  {% set rc = rc_map.get(role_lower, 'default') %}
+  <a class="device-card" style="min-width:280px; flex-shrink:0;"
+    href="{{ url_for('device_detail', device_id=device.id) }}" data-name="{{ device.name | lower }}"
+    data-host="{{ device.host | lower }}" data-role="{{ device.role | lower }}" data-id="{{ device.id | lower }}">
+
+    <div class="device-card-strip"></div>
+
+    <div class="device-card-body">
+      <div class="device-card-head">
+        <div class="device-role-ico dc-ico-{{ rc }}">
+          {% if role_lower == 'router' %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <rect x="2" y="2" width="6" height="6" rx="1" />
+            <rect x="16" y="2" width="6" height="6" rx="1" />
+            <rect x="2" y="16" width="6" height="6" rx="1" />
+            <rect x="16" y="16" width="6" height="6" rx="1" />
+            <line x1="8" y1="5" x2="16" y2="5" />
+            <line x1="8" y1="19" x2="16" y2="19" />
+            <line x1="5" y1="8" x2="5" y2="16" />
+            <line x1="19" y1="8" x2="19" y2="16" />
+          </svg>
+          {% elif role_lower == 'switch' %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <polyline points="16 18 22 12 16 6" />
+            <polyline points="8 6 2 12 8 18" />
+          </svg>
+          {% elif role_lower == 'server' %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" />
+            <rect x="2" y="14" width="20" height="8" rx="2" />
+            <line x1="6" y1="6" x2="6.01" y2="6" />
+            <line x1="6" y1="18" x2="6.01" y2="18" />
+          </svg>
+          {% elif role_lower == 'firewall' %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          {% else %}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <line x1="9" y1="4" x2="9" y2="20" />
+            <line x1="15" y1="4" x2="15" y2="20" />
+            <line x1="4" y1="9" x2="20" y2="9" />
+            <line x1="4" y1="15" x2="20" y2="15" />
+          </svg>
+          {% endif %}
+        </div>
+        <div>
+          <div class="dc-name">{{ device.name }}</div>
+          <div class="dc-host">{{ device.host }}</div>
+        </div>
+      </div>
+
+      <div class="dc-badges">
+        <span class="badge badge-{{ rc }}">{{ device.role }}</span>
+        {% if device.status == 'online' %}
+        <span class="status-pill online">
+          <span class="status-dot green"></span> Online
+        </span>
+        {% elif device.status == 'offline' %}
+        <span class="status-pill offline">
+          <span class="status-dot red"></span> Offline
+        </span>
+        {% else %}
+        <span class="status-pill unknown">
+          <span class="status-dot grey"></span> Unknown
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="device-card-foot">
+      <span class="dc-port">:{{ device.port }} · {{ device.device_type }}</span>
+      <span class="button small" style="background:#2563eb;color:#fff;pointer-events:none;">
+        Open →
+      </span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Empty search state -->
+<p id="noResults" style="display:none; color:var(--muted); font-size:13px; margin-bottom:20px;">
+  Tidak ada perangkat yang cocok dengan pencarian.
+</p>
+
+<!-- Topology diagram -->
+<div class="topology-section" style="position:relative;">
+  <div class="topology-head" style="display:flex; align-items:center; justify-content:space-between;">
+    <div class="topology-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round">
+        <circle cx="12" cy="5" r="3" />
+        <circle cx="5" cy="19" r="3" />
+        <circle cx="19" cy="19" r="3" />
+        <line x1="12" y1="8" x2="5" y2="16" />
+        <line x1="12" y1="8" x2="19" y2="16" />
+      </svg>
+      Topology Diagram
+    </div>
+    <button type="button" id="btnAddDevice" title="Tambah device baru"
+      style="width:30px;height:30px;border-radius:6px;background:#2563eb;color:#fff;border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">
+      +
+    </button>
+  </div>
+
+  {% set total = inventory | length %}
+  {% if total > 0 %}
+  {% set cx = topology_center.x if topology_center else 250 %}
+  {% set cy = topology_center.y if topology_center else 195 %}
+
+  <svg class="topo-svg" viewBox="0 0 500 370" xmlns="http://www.w3.org/2000/svg">
+
+    {# ── Garis dari switch ke tiap router ── #}
+    {% for device in inventory %}
+    {% set point = topology_nodes.get(device.id, {'x': cx, 'y': cy, 'nx': 0, 'ny': -1}) %}
+    {% set rx = point.x | int %}
+    {% set ry = point.y | int %}
+    <line x1="{{ cx }}" y1="{{ cy }}" x2="{{ rx }}" y2="{{ ry }}" stroke="#94a3b8" stroke-width="2.3"
+      stroke-dasharray="6 4" />
+    {% endfor %}
+
+    {# ── Node Switch di tengah ── #}
+    <g>
+      <image href="{{ url_for('static', filename='workgroup-switch.svg') }}" x="{{ cx - 44 }}" y="{{ cy - 30 }}"
+        width="88" height="56" />
+      <text x="{{ cx }}" y="{{ cy + 44 }}" text-anchor="middle" fill="#4c1d95" font-size="13"
+        font-family="DM Sans, sans-serif" font-weight="700"
+        style="paint-order:stroke;stroke:#f8fafc;stroke-width:3px;stroke-linejoin:round;">{{ switch_info.name }}</text>
+      <text x="{{ cx }}" y="{{ cy + 58 }}" text-anchor="middle" fill="#64748b" font-size="11"
+        font-family="JetBrains Mono, monospace"
+        style="paint-order:stroke;stroke:#f8fafc;stroke-width:3px;stroke-linejoin:round;">{{ switch_info.host }}</text>
+    </g>
+
+    {# ── Node device mengelilingi switch ── #}
+    {% for device in inventory %}
+    {% set point = topology_nodes.get(device.id, {'x': cx, 'y': cy, 'nx': 0, 'ny': -1}) %}
+    {% set rx = point.x | int %}
+    {% set ry = point.y | int %}
+    {% set nx = point.nx %}
+    {% set ny = point.ny %}
+    {% set role_l = device.role | lower %}
+    {% if role_l == 'switch' %}
+    {% set svg_file = 'workgroup-switch.svg' %}
+    {% set fill_lbl = '#4c1d95' %}
+    {% set iw = 86 %}
+    {% set ih = 56 %}
+    {% else %}
+    {% set svg_file = 'router.svg' %}
+    {% set fill_lbl = '#1e3a8a' %}
+    {% set iw = 82 %}
+    {% set ih = 56 %}
+    {% endif %}
+
+    {% set ix = (rx - (iw / 2)) | int %}
+    {% set iy = (ry - (ih / 2)) | int %}
+
+    {# Label always centered on the node horizontally #}
+    {% set label_x = rx | int %}
+    {# Place labels OUTSIDE the icon — top nodes: above icon; bottom nodes: below icon; side nodes: also below #}
+    {% if ny <= -0.45 %}
+      {# Node is above center → labels go above the icon top edge #}
+      {% set name_y = (iy - 18) | int %}
+      {% set host_y = (iy - 5) | int %}
+    {% elif ny >= 0.45 %}
+      {# Node is below center → labels go below the icon bottom edge #}
+      {% set name_y = (iy + ih + 16) | int %}
+      {% set host_y = (iy + ih + 30) | int %}
+    {% else %}
+      {# Side nodes (mostly horizontal) → labels go below the icon #}
+      {% set name_y = (iy + ih + 14) | int %}
+      {% set host_y = (iy + ih + 28) | int %}
+    {% endif %}
+
+      <a href="{{ url_for('device_detail', device_id=device.id) }}" class="topo-node" style="cursor:pointer">
+        <image href="{{ url_for('static', filename=svg_file) }}" x="{{ ix }}" y="{{ iy }}" width="{{ iw }}"
+          height="{{ ih }}" />
+        <text x="{{ label_x }}" y="{{ name_y }}" text-anchor="middle" fill="{{ fill_lbl }}" font-size="13"
+          font-family="DM Sans, sans-serif" font-weight="700"
+          style="paint-order:stroke;stroke:#f8fafc;stroke-width:3px;stroke-linejoin:round;">
+          {{ device.name }}
+        </text>
+        <text x="{{ label_x }}" y="{{ host_y }}" text-anchor="middle" fill="#64748b" font-size="11"
+          font-family="JetBrains Mono, monospace"
+          style="paint-order:stroke;stroke:#f8fafc;stroke-width:3px;stroke-linejoin:round;">
+          {{ device.host }}
+        </text>
+      </a>
+      {% endfor %}
+
+      {# ── Label interface di kedua ujung tiap link (switch <-> device) ── #}
+        {% set switch_name_l = switch_info.name | string | lower %}
+        {% for device in inventory %}
+        {% set point = topology_nodes.get(device.id, {'x': cx, 'y': cy, 'nx': 0, 'ny': -1}) %}
+        {% set rx = point.x | int %}
+        {% set ry = point.y | int %}
+        {% set nx = point.nx %}
+        {% set ny = point.ny %}
+        {% set device_id_l = device.id | string | lower %}
+        {% set view = namespace(device_intf='', switch_intf='') %}
+
+        {% for link in links %}
+        {% set from_id = link.get('from', '') | string | lower %}
+        {% set to_id = link.get('to', '') | string | lower %}
+        {% if from_id == device_id_l and (to_id == switch_name_l or to_id == 'switch') %}
+        {% set view.device_intf = link.get('from_intf', '') %}
+        {% set view.switch_intf = link.get('to_intf', '') %}
+        {% elif to_id == device_id_l and (from_id == switch_name_l or from_id == 'switch') %}
+        {% set view.device_intf = link.get('to_intf', '') %}
+        {% set view.switch_intf = link.get('from_intf', '') %}
+        {% endif %}
+        {% endfor %}
+
+        {#
+          Interface labels: place each label on the link line, close to its endpoint.
+          - t=0.30 → 30% of the way from the device toward the switch
+          - t=0.30 → 30% of the way from the switch toward the device
+          - perpendicular nudge = 11px so text floats beside the dashed link
+        #}
+        {% set t = 0.28 %}
+        {# Device-side: from device node toward switch center #}
+        {% set lx_dev = (rx + t * (cx - rx)) | int %}
+        {% set ly_dev = (ry + t * (cy - ry)) | int %}
+        {# Switch-side: from switch center toward device node #}
+        {% set lx_sw = (cx + t * (rx - cx)) | int %}
+        {% set ly_sw = (cy + t * (ry - cy)) | int %}
+        {# Perpendicular unit vector to the link #}
+        {% set px = -ny %}
+        {% set py = nx %}
+        {% set nudge = 11 %}
+        {% set dx = (px * nudge) | int %}
+        {% set dy = (py * nudge) | int %}
+
+        {% if view.device_intf %}
+        <text x="{{ lx_dev + dx }}" y="{{ ly_dev + dy }}" text-anchor="middle" fill="#334155" font-size="10"
+          font-family="JetBrains Mono, monospace"
+          style="paint-order:stroke;stroke:#f8fafc;stroke-width:4px;stroke-linejoin:round;font-weight:600;">
+          {{ view.device_intf | replace('FastEthernet', 'e') | replace('Ethernet', 'e') }}
+        </text>
+        {% endif %}
+
+        {% if view.switch_intf %}
+        <text x="{{ lx_sw + dx }}" y="{{ ly_sw + dy }}" text-anchor="middle" fill="#334155" font-size="10"
+          font-family="JetBrains Mono, monospace"
+          style="paint-order:stroke;stroke:#f8fafc;stroke-width:4px;stroke-linejoin:round;font-weight:600;">
+          {{ view.switch_intf | replace('FastEthernet', 'e') | replace('Ethernet', 'e') }}
+        </text>
+        {% endif %}
+        {% endfor %}
+
+  </svg>
+  {% endif %}
+
+  <div style="text-align:right; padding:4px 12px 8px; font-size:11px; color:var(--muted);">
+    Klik node untuk buka device
+  </div>
+</div>
+
+{# ── Modal Add Device ──────────────────────────────────────── #}
+<div id="addDeviceOverlay"
+  style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; display:none; align-items:center; justify-content:center;">
+  <div
+    style="background:#fff; border-radius:14px; padding:28px 32px; width:480px; max-width:95vw; box-shadow:0 12px 40px rgba(0,0,0,.18);">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+      <h3 style="margin:0; font-size:18px; font-weight:700; color:#1e293b;">Tambah Device Baru</h3>
+      <button type="button" id="btnCloseModal"
+        style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">&times;</button>
+    </div>
+    <form id="addDeviceForm">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">Device ID *</label>
+          <input name="id" required placeholder="r4"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">Name</label>
+          <input name="name" placeholder="router4"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">IP Address *</label>
+          <input name="host" required placeholder="192.168.56.14"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">SSH Port</label>
+          <input name="port" type="number" value="22" min="1" max="65535"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">Device Type</label>
+          <select name="device_type"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;">
+            <option value="cisco_ios" selected>cisco_ios</option>
+            <option value="cisco_xe">cisco_xe</option>
+            <option value="cisco_xr">cisco_xr</option>
+            <option value="cisco_nxos">cisco_nxos</option>
+            <option value="cisco_asa">cisco_asa</option>
+            <option value="mikrotik_routeros">mikrotik_routeros</option>
+            <option value="linux">linux</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">Role</label>
+          <select name="role"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;">
+            <option value="router" selected>router</option>
+            <option value="switch">switch</option>
+            <option value="firewall">firewall</option>
+            <option value="server">server</option>
+          </select>
+        </div>
+      </div>
+      <hr style="margin:16px 0; border:none; border-top:1px solid #e2e8f0;">
+      <p style="font-size:12px;font-weight:600;color:#334155;margin:0 0 8px;">Koneksi Topologi (Perangkat baru ke
+        tujuan)
+      </p>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">Perangkat Dst.</label>
+          <input name="connected_to" value="switch"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">Interface Src.</label>
+          <input name="local_intf" placeholder="contoh: Ethernet0/0 (r4)"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#475569;">Interface Dst.</label>
+          <input name="remote_intf" placeholder="contoh: Ethernet0/4 (switch)"
+            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        </div>
+      </div>
+      <div style="margin-top:18px; text-align:right;">
+        <button type="button" id="btnCancelModal"
+          style="padding:8px 18px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#475569;font-size:13px;cursor:pointer;margin-right:8px;">Batal</button>
+        <button type="submit"
+          style="padding:8px 22px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>
+      </div>
+      <p id="addDeviceMsg" style="margin:10px 0 0;font-size:12px;display:none;"></p>
+    </form>
+  </div>
+</div>
+
+
+
+{% else %}
+<div class="card" style="text-align:center; padding:48px;">
+  <p style="font-size:32px; margin-bottom:12px;">📭</p>
+  <p class="muted">Tidak ada perangkat di inventory.</p>
+</div>
+{% endif %}
+
+<!-- Quick Connect -->
+<div class="qc-section">
+  <div class="qc-header">
+    <div class="qc-badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round">
+        <path d="M5 12h14" />
+        <path d="M12 5l7 7-7 7" />
+      </svg>
+      Quick Connect
+    </div>
+    <p class="muted" style="font-size:13px;">Hubungkan ke perangkat yang tidak ada di inventory.</p>
+  </div>
+
   <form method="post" action="{{ url_for('quick_connect') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
     <div class="form-row">
       <div class="form-group">
         <label for="label">Label</label>
-        <input id="label" name="label" placeholder="Contoh: router-backup">
+        <input id="label" name="label" placeholder="router-backup">
       </div>
       <div class="form-group">
         <label for="host">IP Address / Domain <span class="required">*</span></label>
-        <input id="host" name="host" placeholder="Contoh: 192.168.1.1" required>
+        <input id="host" name="host" placeholder="192.168.1.1" required>
       </div>
       <div class="form-group">
         <label for="port">SSH Port</label>
@@ -77,23 +479,118 @@
         <input id="device_type" name="device_type" value="cisco_ios">
       </div>
     </div>
-    <div class="form-row">
+
+    <div class="form-row" style="margin-top:4px;">
       <div class="form-group">
         <label for="qc_username">SSH Username</label>
         <input id="qc_username" name="device_username" placeholder="admin" autocomplete="off">
       </div>
       <div class="form-group">
         <label for="qc_password">SSH Password</label>
-        <input id="qc_password" name="device_password" type="password" placeholder="Password SSH" autocomplete="new-password">
+        <input id="qc_password" name="device_password" type="password" placeholder="Password SSH"
+          autocomplete="new-password">
       </div>
-      <div class="form-group" style="grid-column: 1 / -1;">
+      <div class="form-group">
         <label for="qc_secret">Enable Secret</label>
         <input id="qc_secret" name="device_secret" type="password" placeholder="Opsional">
       </div>
     </div>
-    <div class="actions" style="margin-top:12px;">
-      <button type="submit">Connect</button>
+
+    <div class="actions actions-end" style="margin-top:14px;">
+      <button type="submit">
+        Connect
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round">
+          <path d="M5 12h14" />
+          <path d="M12 5l7 7-7 7" />
+        </svg>
+      </button>
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /* ── Search ── */
+  var searchInput = document.getElementById("deviceSearch");
+  var cards = document.querySelectorAll(".device-card");
+  var noResults = document.getElementById("noResults");
+  if (searchInput) {
+    searchInput.addEventListener("input", function () {
+      var q = this.value.toLowerCase().trim();
+      var visible = 0;
+      cards.forEach(function (card) {
+        var match = !q
+          || card.dataset.name.includes(q)
+          || card.dataset.host.includes(q)
+          || card.dataset.role.includes(q)
+          || card.dataset.id.includes(q);
+        card.style.display = match ? "" : "none";
+        if (match) visible++;
+      });
+      if (noResults) noResults.style.display = (visible === 0 && q) ? "" : "none";
+    });
+  }
+
+  /* ── Modal Add Device ── */
+  var overlay = document.getElementById("addDeviceOverlay");
+  var btnAdd = document.getElementById("btnAddDevice");
+  var btnClose = document.getElementById("btnCloseModal");
+  var btnCancel = document.getElementById("btnCancelModal");
+  var form = document.getElementById("addDeviceForm");
+  var msg = document.getElementById("addDeviceMsg");
+
+  function openModal() { overlay.style.display = "flex"; }
+  function closeModal() { overlay.style.display = "none"; msg.style.display = "none"; }
+
+  if (btnAdd) btnAdd.addEventListener("click", openModal);
+  if (btnClose) btnClose.addEventListener("click", closeModal);
+  if (btnCancel) btnCancel.addEventListener("click", closeModal);
+  if (overlay) overlay.addEventListener("click", function (e) { if (e.target === overlay) closeModal(); });
+
+  if (form) {
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      msg.style.display = "none";
+      var fd = new FormData(form);
+      var body = {
+        id: fd.get("id"),
+        name: fd.get("name") || fd.get("id"),
+        host: fd.get("host"),
+        port: parseInt(fd.get("port") || "22", 10),
+        device_type: fd.get("device_type"),
+        role: fd.get("role"),
+        connected_to: fd.get("connected_to"),
+        local_intf: fd.get("local_intf"),
+        remote_intf: fd.get("remote_intf"),
+      };
+      fetch("{{ url_for('api_add_device') }}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token() }}",
+        },
+        body: JSON.stringify(body),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          msg.style.display = "block";
+          if (data.ok) {
+            msg.style.color = "#16a34a";
+            msg.textContent = data.message;
+            setTimeout(function () { location.reload(); }, 800);
+          } else {
+            msg.style.color = "#dc2626";
+            msg.textContent = data.message || "Gagal menambahkan device.";
+          }
+        })
+        .catch(function (err) {
+          msg.style.display = "block";
+          msg.style.color = "#dc2626";
+          msg.textContent = "Network error: " + err.message;
+        });
+    });
+  }
+</script>
 {% endblock %}

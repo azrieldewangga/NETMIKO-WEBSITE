@@ -50,6 +50,8 @@ pip install flask flask-wtf netmiko
 
 ### 2. (Opsional) Atur environment variable
 
+Linux/macOS:
+
 ```bash
 export FLASK_SECRET_KEY="ganti-dengan-secret-panjang"
 export WEB_USERNAME="admin"
@@ -60,6 +62,19 @@ export LAB_DEVICE_USERNAME="admin"
 export LAB_DEVICE_PASSWORD="admin"
 export LAB_DEVICE_SECRET=""
 ```
+
+Windows (PowerShell):
+
+```powershell
+setx FLASK_SECRET_KEY "ganti-dengan-secret-panjang"
+setx WEB_USERNAME "admin"
+setx WEB_PASSWORD "admin"
+setx LAB_DEVICE_USERNAME "admin"
+setx LAB_DEVICE_PASSWORD "admin"
+setx LAB_DEVICE_SECRET ""
+```
+
+Jika `FLASK_SECRET_KEY` tidak di-set, aplikasi akan memakai fallback file lokal `.secret_key` agar session tetap stabil saat restart di development.
 
 ### 3. Jalankan server
 
@@ -161,3 +176,37 @@ r1,     ,                   ssh_port,    2222
 - **Flask** — web framework
 - **Flask-WTF** — CSRF protection
 - **Netmiko** — library SSH untuk perangkat jaringan
+
+---
+
+## 🚫 Yang Tidak Boleh Di-push Ke Git Public
+
+- File rahasia lokal: `.secret_key`, `.env`, `.env.*`
+- File log runtime: `logs/*.log`
+- Cache build Python: `__pycache__/`, `*.pyc`
+- File lokal editor/agent: `.claude/settings.local.json`, `.vscode/`, `.idea/`
+
+Semua pola di atas sudah dimasukkan ke `.gitignore`.
+
+### Kalau sudah terlanjur ke-track Git
+
+Jalankan perintah ini sekali untuk melepas dari tracking (file lokal tetap ada):
+
+```bash
+git rm --cached .secret_key
+git rm --cached -r __pycache__ labpanel/__pycache__
+git rm --cached logs/*.log
+git rm --cached .claude/settings.local.json
+git add .gitignore
+git commit -m "chore: ignore local secrets and runtime artifacts"
+```
+
+---
+
+## ✅ Agar Clone di VM Tidak Rusak
+
+1. Clone repo biasa.
+2. Atur environment variable di VM (lihat bagian Instalasi).
+3. Jalankan aplikasi; file `.secret_key` dan folder `logs/` akan dibuat otomatis jika belum ada.
+
+Dengan pola ini, repo aman untuk public, tapi tetap langsung bisa dipakai di mesin baru.

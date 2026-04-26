@@ -1,20 +1,385 @@
-{% extends "base.html" %}
+<!doctype html>
+<html lang="id">
 
-{% block content %}
-<div class="card login-card">
-  <h1>Login</h1>
-  <p class="muted">Masuk untuk membuka panel otomasi jaringan.</p>
-  <form method="post">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label for="username">Username</label>
-    <input id="username" name="username" autocomplete="username" required>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — NetPanel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      background: #f0f4ff;
+    }
 
-    <div style="margin-top: 20px;">
-      <button type="submit" style="width:100%;">Masuk →</button>
+    /* ── LEFT PANEL ─────────────────────────────── */
+    .l-panel {
+      width: 42%;
+      min-height: 100vh;
+      background: #0c1e3d;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 44px 52px;
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .l-panel::before {
+      content: '';
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(37, 99, 235, .28) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    .l-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -80px;
+      left: -80px;
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, rgba(59, 130, 246, .15) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    .l-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .l-brand-icon {
+      width: 38px;
+      height: 38px;
+      background: #2563eb;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, .5);
+    }
+
+    .l-brand-name {
+      font-family: 'Sora', sans-serif;
+      font-size: 19px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .l-hero {
+      position: relative;
+      z-index: 1;
+    }
+
+    .l-hero-title {
+      font-family: 'Sora', sans-serif;
+      font-size: 33px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      letter-spacing: -.6px;
+    }
+
+    .l-hero-sub {
+      font-size: 14px;
+      color: rgba(148, 163, 184, .85);
+      line-height: 1.75;
+      max-width: 310px;
+    }
+
+    .l-features {
+      position: relative;
+      z-index: 1;
+    }
+
+    .l-feat {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: rgba(148, 163, 184, .75);
+      margin-bottom: 10px;
+    }
+
+    .l-feat-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #3b82f6;
+      flex-shrink: 0;
+    }
+
+    /* decorative SVG positioned bottom-right of left panel */
+    .l-topo {
+      position: absolute;
+      bottom: 52px;
+      right: 24px;
+      opacity: .13;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── RIGHT PANEL ────────────────────────────── */
+    .r-panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 60px;
+    }
+
+    .r-form-wrap {
+      width: 100%;
+      max-width: 390px;
+    }
+
+    .r-heading {
+      margin-bottom: 32px;
+    }
+
+    .r-title {
+      font-family: 'Sora', sans-serif;
+      font-size: 27px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -.5px;
+      margin-bottom: 7px;
+    }
+
+    .r-sub {
+      font-size: 14px;
+      color: #64748b;
+    }
+
+    .f-label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .55px;
+      margin-bottom: 7px;
+      margin-top: 20px;
+    }
+
+    .f-input {
+      width: 100%;
+      padding: 11px 14px;
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      color: #0f172a;
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      transition: border-color .18s, box-shadow .18s, background .18s;
+    }
+
+    .f-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+      background: #fff;
+    }
+
+    .f-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .f-submit {
+      width: 100%;
+      margin-top: 28px;
+      padding: 13px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: 'Sora', sans-serif;
+      cursor: pointer;
+      letter-spacing: -.2px;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, .4);
+      transition: background .18s, transform .1s, box-shadow .18s;
+    }
+
+    .f-submit:hover {
+      background: #1d4ed8;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, .5);
+    }
+
+    .f-submit:active {
+      transform: scale(.98);
+    }
+
+    .r-footer {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tech-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+    }
+
+    @media (max-width: 768px) {
+      .l-panel {
+        display: none;
+      }
+
+      .r-panel {
+        padding: 32px 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- LEFT: Branding panel -->
+  <div class="l-panel">
+    <div class="l-brand">
+      <div class="l-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="6" height="6" rx="1" />
+          <rect x="16" y="2" width="6" height="6" rx="1" />
+          <rect x="2" y="16" width="6" height="6" rx="1" />
+          <rect x="16" y="16" width="6" height="6" rx="1" />
+          <line x1="8" y1="5" x2="16" y2="5" />
+          <line x1="8" y1="19" x2="16" y2="19" />
+          <line x1="5" y1="8" x2="5" y2="16" />
+          <line x1="19" y1="8" x2="19" y2="16" />
+        </svg>
+      </div>
+      <span class="l-brand-name">NetPanel</span>
     </div>
-  </form>
-</div>
-{% endblock %}
+
+    <div class="l-hero">
+      <h1 class="l-hero-title">Kendali jaringan<br>dari satu panel.</h1>
+      <p class="l-hero-sub">
+        Remote konfigurasi perangkat Cisco IOS via SSH — tanpa buka terminal, langsung dari browser.
+      </p>
+    </div>
+
+    <div class="l-features">
+      <div class="l-feat"><span class="l-feat-dot"></span>Konfigurasi interface &amp; IP address</div>
+      <div class="l-feat"><span class="l-feat-dot"></span>Batch eksekusi ke banyak device sekaligus</div>
+      <div class="l-feat"><span class="l-feat-dot"></span>CLI output real-time via Netmiko SSH</div>
+      <div class="l-feat"><span class="l-feat-dot"></span>CSRF-protected &amp; session-based auth</div>
+    </div>
+
+    <!-- Decorative topology SVG -->
+    <svg class="l-topo" width="220" height="200" viewBox="0 0 220 200" fill="none">
+      <line x1="110" y1="70" x2="40" y2="130" stroke="white" stroke-width="1.5" />
+      <line x1="110" y1="70" x2="180" y2="130" stroke="white" stroke-width="1.5" />
+      <line x1="40" y1="130" x2="110" y2="170" stroke="white" stroke-width="1" />
+      <line x1="180" y1="130" x2="110" y2="170" stroke="white" stroke-width="1" />
+      <line x1="110" y1="70" x2="110" y2="20" stroke="white" stroke-width="1" />
+      <line x1="40" y1="130" x2="10" y2="170" stroke="white" stroke-width="1" />
+      <line x1="180" y1="130" x2="210" y2="170" stroke="white" stroke-width="1" />
+      <circle cx="110" cy="70" r="18" fill="rgba(37,99,235,.75)" stroke="white" stroke-width="1.5" />
+      <circle cx="40" cy="130" r="13" fill="rgba(37,99,235,.55)" stroke="white" stroke-width="1.2" />
+      <circle cx="180" cy="130" r="13" fill="rgba(37,99,235,.55)" stroke="white" stroke-width="1.2" />
+      <circle cx="110" cy="170" r="10" fill="rgba(37,99,235,.35)" stroke="white" stroke-width="1" />
+      <circle cx="110" cy="20" r="8" fill="rgba(37,99,235,.3)" stroke="white" stroke-width="1" />
+      <circle cx="10" cy="170" r="7" fill="rgba(37,99,235,.25)" stroke="white" stroke-width="1" />
+      <circle cx="210" cy="170" r="7" fill="rgba(37,99,235,.25)" stroke="white" stroke-width="1" />
+      <text x="110" y="74" text-anchor="middle" fill="white" font-size="8" font-family="monospace"
+        font-weight="700">CORE</text>
+    </svg>
+  </div>
+
+  <!-- RIGHT: Login form -->
+  <div class="r-panel">
+    <div class="r-form-wrap">
+      <div class="r-heading">
+        <h1 class="r-title">Selamat datang</h1>
+        <p class="r-sub">Masuk untuk membuka panel otomasi jaringan.</p>
+      </div>
+
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <label class="f-label" for="username">Username</label>
+        <input class="f-input" id="username" name="username" autocomplete="username" required
+          placeholder="Masukkan username">
+
+        <label class="f-label" for="password">Password</label>
+        <input class="f-input" id="password" name="password" type="password" autocomplete="current-password" required
+          placeholder="Masukkan password">
+
+        <button type="submit" class="f-submit">Masuk ke Panel →</button>
+      </form>
+
+      <div class="r-footer">
+        <span class="tech-pill">🔒 Cisco IOS</span>
+        <span class="tech-pill">⚡ Netmiko SSH</span>
+        <span class="tech-pill">🌐 Flask</span>
+      </div>
+    </div>
+  </div>
+
+  <script id="flashData" type="application/json">{{ get_flashed_messages(with_categories=true) | tojson }}</script>
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script>
+    function showToast(msg, cat) {
+      var c = { success: "#16a34a", error: "#dc2626", warning: "#d97706", info: "#0369a1" };
+      Toastify({
+        text: msg, duration: 5000, close: true, gravity: "bottom", position: "right",
+        style: { background: c[cat] || c.info, borderRadius: "8px", fontWeight: "600" }
+      }).showToast();
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      var flashMessages = [];
+      var flashData = document.getElementById("flashData");
+      if (flashData && flashData.textContent.trim()) {
+        try {
+          flashMessages = JSON.parse(flashData.textContent);
+        } catch (err) {
+          flashMessages = [];
+        }
+      }
+
+      flashMessages.forEach(function (item) {
+        showToast(item[1], item[0]);
+      });
+    });
+  </script>
+</body>
+
+</html>
