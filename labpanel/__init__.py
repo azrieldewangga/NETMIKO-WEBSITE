@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import secrets
@@ -58,9 +59,22 @@ def create_app(test_config: dict | None = None) -> Flask:
     # ── Cek kredensial default ────────────────────────────────
     web_user = os.environ.get("WEB_USERNAME", "admin")
     web_pass = os.environ.get("WEB_PASSWORD", "admin")
+
+    # Override dengan profile.json jika ada
+    profile_path = PROJECT_DIR / "profile.json"
+    if profile_path.exists():
+        try:
+            _profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            if _profile.get("username"):
+                web_user = _profile["username"]
+            if _profile.get("password"):
+                web_pass = _profile["password"]
+        except Exception:
+            pass
+
     if web_user == "admin" and web_pass == "admin":
         log.warning(
-            "⚠  WEB_USERNAME/WEB_PASSWORD masih default (admin/admin). "
+            "WEB_USERNAME/WEB_PASSWORD masih default (admin/admin). "
             "Ganti segera untuk keamanan!"
         )
 
@@ -81,6 +95,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         LAB_DEVICE_PASSWORD=device_pass,
         LAB_DEVICE_SECRET=os.environ.get("LAB_DEVICE_SECRET", ""),
         INVENTORY_PATH=str(PROJECT_DIR / "inventory.json"),
+        PROFILE_PATH=str(PROJECT_DIR / "profile.json"),
+        UPLOAD_FOLDER=str(PROJECT_DIR / "static" / "uploads"),
     )
     if test_config:
         app.config.update(test_config)

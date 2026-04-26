@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import wraps
@@ -526,3 +527,89 @@ def register_routes(app):
             return jsonify({"ok": True, "message": f"Device '{device_data['id']}' berhasil ditambahkan."})
         except InventoryError as exc:
             return jsonify({"ok": False, "message": str(exc)}), 400
+
+    # ── PROFILE ───────────────────────────────────────────────
+
+    @app.context_processor
+    def inject_profile_ctx():
+        if session.get("logged_in"):
+            try:
+                path = Path(current_app.config["PROFILE_PATH"])
+                data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+                return {"topbar_avatar": data.get("avatar")}
+            except Exception:
+                pass
+        return {"topbar_avatar": None}
+
+    def _load_profile() -> dict:
+        path = Path(current_app.config["PROFILE_PATH"])
+        if path.exists():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        return {}
+
+    def _save_profile(data: dict):
+        path = Path(current_app.config["PROFILE_PATH"])
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    @app.route("/profile")
+    @login_required
+    def profile():
+        data = _load_profile()
+        username = data.get("username") or current_app.config["WEB_USERNAME"]
+        avatar = data.get("avatar")
+        return render_template(
+            "profile.html",
+            title="Profile",
+            username=username,
+            avatar=avatar,
+        )
+
+    @app.route("/profile/save", methods=["POST"])
+    @login_required
+    def profile_save():
+        field = request.form.get("field", "").strip()
+        value = request.form.get("value", "").strip()
+
+        if field not in ("username", "password"):
+            return jsonify({"ok": False, "message": "Field tidak valid."})
+        if not value:
+            return jsonify({"ok": False, "message": "Value tidak boleh kosong."})
+
+        data = _load_profile()
+        data[field] = value
+        _save_profile(data)
+
+        # Update runtime config agar login langsung pakai kredensial baru
+        if field == "username":
+            current_app.config["WEB_USERNAME"] = value
+            session["web_username"] = value
+        elif field == "password":
+            current_app.config["WEB_PASSWORD"] = value
+
+        return jsonify({"ok": True})
+
+    @app.route("/profile/avatar", methods=["POST"])
+    @login_required
+    def profile_avatar():
+        file = request.files.get("avatar")
+        if not file or not file.filename:
+            return jsonify({"ok": False, "message": "Tidak ada file dipilih."})
+
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        if ext not in {"png", "jpg", "jpeg", "gif", "webp"}:
+            return jsonify({"ok": False, "message": "Format tidak didukung (png/jpg/gif/webp)."})
+
+        upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"avatar.{ext}"
+        file.save(upload_dir / filename)
+
+        data = _load_profile()
+        data["avatar"] = filename
+        _save_profile(data)
+
+        return jsonify({"ok": True, "url": url_for("static", filename=f"uploads/{filename}")})

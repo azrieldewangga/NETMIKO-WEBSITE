@@ -23,7 +23,7 @@
 
 <!-- Breadcrumb -->
 <div class="breadcrumb">
-  <a href="{{ url_for('dashboard') }}">Dashboard</a>
+  <a href="{{ url_for('dashboard') }}">Overview</a>
   <span class="breadcrumb-sep">/</span>
   <span class="breadcrumb-cur">Batch Actions</span>
 </div>
@@ -158,7 +158,10 @@
     <!-- Successful -->
     <div class="results-block">
       <div class="results-head ok">
-        <span class="results-count">✓ Berhasil</span>
+        <span class="results-count" style="display:flex;align-items:center;gap:5px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Berhasil
+        </span>
         <span class="badge badge-success">{{ results.successful | length }}</span>
       </div>
       {% if results.successful %}
@@ -189,7 +192,10 @@
     <!-- Failed -->
     <div class="results-block">
       <div class="results-head fail">
-        <span class="results-count">✗ Gagal</span>
+        <span class="results-count" style="display:flex;align-items:center;gap:5px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Gagal
+        </span>
         <span class="badge badge-danger">{{ results.failed | length }}</span>
       </div>
       {% if results.failed %}
@@ -211,14 +217,21 @@
       </div>
       {% else %}
       <div class="results-table-wrap" style="padding:14px 16px;">
-        <p class="muted small" style="color:var(--success);">🎉 Semua berhasil!</p>
+        <p class="muted small" style="color:var(--success); display:flex; align-items:center; gap:6px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Semua berhasil!
+        </p>
       </div>
       {% endif %}
     </div>
 
     {% else %}
-    <div class="card" style="text-align:center; padding:40px 20px; border-style:dashed;">
-      <p style="font-size:28px; margin-bottom:10px;">📊</p>
+    <div class="card" style="text-align:center; padding:40px 20px;">
+      <div style="display:flex;justify-content:center;margin-bottom:12px;color:var(--muted-light);">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
       <p class="muted">Hasil eksekusi akan muncul di sini setelah Execute dijalankan.</p>
     </div>
     {% endif %}
@@ -230,8 +243,14 @@
 <div id="commandModal" class="modal-overlay" style="display:none;">
   <div class="modal-box modal-lg">
     <div class="modal-header">
-      <h3>📋 Command Reference</h3>
-      <button class="modal-close" onclick="closeCommandModal()">✕</button>
+      <h3 style="display:flex;align-items:center;gap:7px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+        Command Reference
+      </h3>
+      <button class="modal-close" onclick="closeCommandModal()">&#10005;</button>
     </div>
     <div class="modal-scroll">
       <table>
@@ -294,7 +313,7 @@ r1;r2,, ssh_port, 2022</pre>
     if (form) form.addEventListener("submit", function () {
       var btn = document.getElementById("execBtn");
       btn.disabled    = true;
-      btn.innerHTML   = "⏳ Executing...";
+      btn.textContent = "Executing...";
     });
   });
 </script>

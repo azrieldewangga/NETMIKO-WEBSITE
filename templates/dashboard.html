@@ -9,6 +9,13 @@
 {# role → css class helper #}
 {% set rc_map = {'router':'router','switch':'switch','firewall':'firewall','server':'server'} %}
 
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+  <span>NetPanel</span>
+  <span class="breadcrumb-sep">/</span>
+  <span class="breadcrumb-cur">Overview</span>
+</div>
+
 <!-- Page header -->
 <div class="page-header">
   <div>
@@ -21,16 +28,16 @@
 <div class="stats-bar">
   <div class="stat-card">
     <div class="stat-icon blue">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round">
-        <rect x="2" y="2" width="6" height="6" rx="1" />
-        <rect x="16" y="2" width="6" height="6" rx="1" />
-        <rect x="2" y="16" width="6" height="6" rx="1" />
-        <rect x="16" y="16" width="6" height="6" rx="1" />
-        <line x1="8" y1="5" x2="16" y2="5" />
-        <line x1="8" y1="19" x2="16" y2="19" />
-        <line x1="5" y1="8" x2="5" y2="16" />
-        <line x1="19" y1="8" x2="19" y2="16" />
+        <rect x="2" y="2" width="6" height="6" rx="1"/>
+        <rect x="16" y="2" width="6" height="6" rx="1"/>
+        <rect x="2" y="16" width="6" height="6" rx="1"/>
+        <rect x="16" y="16" width="6" height="6" rx="1"/>
+        <line x1="8" y1="5" x2="16" y2="5"/>
+        <line x1="8" y1="19" x2="16" y2="19"/>
+        <line x1="5" y1="8" x2="5" y2="16"/>
+        <line x1="19" y1="8" x2="19" y2="16"/>
       </svg>
     </div>
     <div>
@@ -41,10 +48,10 @@
 
   <div class="stat-card">
     <div class="stat-icon green">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-        <polyline points="22 4 12 14.01 9 11.01" />
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
       </svg>
     </div>
     <div>
@@ -55,10 +62,10 @@
 
   <div class="stat-card">
     <div class="stat-icon violet">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round">
-        <polyline points="16 18 22 12 16 6" />
-        <polyline points="8 6 2 12 8 18" />
+        <polyline points="16 18 22 12 16 6"/>
+        <polyline points="8 6 2 12 8 18"/>
       </svg>
     </div>
     <div>
@@ -70,24 +77,25 @@
 
 <!-- Search -->
 <div class="search-wrap">
-  <svg class="search-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+  <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
     stroke-linecap="round">
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    <circle cx="11" cy="11" r="8"/>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
   </svg>
   <input type="text" id="deviceSearch" class="search-inp"
     placeholder="Cari perangkat berdasarkan nama, IP, atau role...">
 </div>
 
 {% if inventory %}
-<!-- Device cards – horizontal scroll when > 3 -->
-<div class="device-grid" id="deviceGrid" style="display:flex; gap:16px; overflow-x:auto; padding-bottom:8px;">
+<!-- Device cards -->
+<div class="device-grid" id="deviceGrid" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:8px;">
   {% for device in inventory %}
   {% set role_lower = device.role | lower %}
   {% set rc = rc_map.get(role_lower, 'default') %}
-  <a class="device-card" style="min-width:280px; flex-shrink:0;"
+  <a class="device-card" style="min-width:260px; flex-shrink:0;"
     href="{{ url_for('device_detail', device_id=device.id) }}" data-name="{{ device.name | lower }}"
-    data-host="{{ device.host | lower }}" data-role="{{ device.role | lower }}" data-id="{{ device.id | lower }}">
+    data-host="{{ device.host | lower }}" data-role="{{ device.role | lower }}" data-id="{{ device.id | lower }}"
+    data-role="{{ role_lower }}">
 
     <div class="device-card-strip"></div>
 
@@ -95,44 +103,30 @@
       <div class="device-card-head">
         <div class="device-role-ico dc-ico-{{ rc }}">
           {% if role_lower == 'router' %}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round">
-            <rect x="2" y="2" width="6" height="6" rx="1" />
-            <rect x="16" y="2" width="6" height="6" rx="1" />
-            <rect x="2" y="16" width="6" height="6" rx="1" />
-            <rect x="16" y="16" width="6" height="6" rx="1" />
-            <line x1="8" y1="5" x2="16" y2="5" />
-            <line x1="8" y1="19" x2="16" y2="19" />
-            <line x1="5" y1="8" x2="5" y2="16" />
-            <line x1="19" y1="8" x2="19" y2="16" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="2" y="2" width="6" height="6" rx="1"/><rect x="16" y="2" width="6" height="6" rx="1"/>
+            <rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/>
+            <line x1="8" y1="5" x2="16" y2="5"/><line x1="8" y1="19" x2="16" y2="19"/>
+            <line x1="5" y1="8" x2="5" y2="16"/><line x1="19" y1="8" x2="19" y2="16"/>
           </svg>
           {% elif role_lower == 'switch' %}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round">
-            <polyline points="16 18 22 12 16 6" />
-            <polyline points="8 6 2 12 8 18" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
           </svg>
           {% elif role_lower == 'server' %}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round">
-            <rect x="2" y="2" width="20" height="8" rx="2" />
-            <rect x="2" y="14" width="20" height="8" rx="2" />
-            <line x1="6" y1="6" x2="6.01" y2="6" />
-            <line x1="6" y1="18" x2="6.01" y2="18" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
           </svg>
           {% elif role_lower == 'firewall' %}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
           {% else %}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round">
-            <rect x="4" y="4" width="16" height="16" rx="2" />
-            <line x1="9" y1="4" x2="9" y2="20" />
-            <line x1="15" y1="4" x2="15" y2="20" />
-            <line x1="4" y1="9" x2="20" y2="9" />
-            <line x1="4" y1="15" x2="20" y2="15" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+            <line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/>
+            <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/>
           </svg>
           {% endif %}
         </div>
@@ -161,9 +155,9 @@
     </div>
 
     <div class="device-card-foot">
-      <span class="dc-port">:{{ device.port }} · {{ device.device_type }}</span>
-      <span class="button small" style="background:#2563eb;color:#fff;pointer-events:none;">
-        Open →
+      <span class="dc-port">:{{ device.port }} &middot; {{ device.device_type }}</span>
+      <span class="button small" style="background:var(--accent);color:#fff;pointer-events:none;">
+        Open &rarr;
       </span>
     </div>
   </a>
@@ -177,20 +171,20 @@
 
 <!-- Topology diagram -->
 <div class="topology-section" style="position:relative;">
-  <div class="topology-head" style="display:flex; align-items:center; justify-content:space-between;">
+  <div class="topology-head">
     <div class="topology-title">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round">
-        <circle cx="12" cy="5" r="3" />
-        <circle cx="5" cy="19" r="3" />
-        <circle cx="19" cy="19" r="3" />
-        <line x1="12" y1="8" x2="5" y2="16" />
-        <line x1="12" y1="8" x2="19" y2="16" />
+        <circle cx="12" cy="5" r="3"/>
+        <circle cx="5" cy="19" r="3"/>
+        <circle cx="19" cy="19" r="3"/>
+        <line x1="12" y1="8" x2="5" y2="16"/>
+        <line x1="12" y1="8" x2="19" y2="16"/>
       </svg>
       Topology Diagram
     </div>
     <button type="button" id="btnAddDevice" title="Tambah device baru"
-      style="width:30px;height:30px;border-radius:6px;background:#2563eb;color:#fff;border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">
+      style="width:28px;height:28px;border-radius:4px;background:var(--accent);color:#fff;border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-family:var(--font-body);">
       +
     </button>
   </div>
@@ -207,7 +201,7 @@
     {% set point = topology_nodes.get(device.id, {'x': cx, 'y': cy, 'nx': 0, 'ny': -1}) %}
     {% set rx = point.x | int %}
     {% set ry = point.y | int %}
-    <line x1="{{ cx }}" y1="{{ cy }}" x2="{{ rx }}" y2="{{ ry }}" stroke="#94a3b8" stroke-width="2.3"
+    <line x1="{{ cx }}" y1="{{ cy }}" x2="{{ rx }}" y2="{{ ry }}" stroke="#D9D9D9" stroke-width="2"
       stroke-dasharray="6 4" />
     {% endfor %}
 
@@ -215,12 +209,12 @@
     <g>
       <image href="{{ url_for('static', filename='workgroup-switch.svg') }}" x="{{ cx - 44 }}" y="{{ cy - 30 }}"
         width="88" height="56" />
-      <text x="{{ cx }}" y="{{ cy + 44 }}" text-anchor="middle" fill="#4c1d95" font-size="13"
-        font-family="DM Sans, sans-serif" font-weight="700"
-        style="paint-order:stroke;stroke:#f8fafc;stroke-width:3px;stroke-linejoin:round;">{{ switch_info.name }}</text>
-      <text x="{{ cx }}" y="{{ cy + 58 }}" text-anchor="middle" fill="#64748b" font-size="11"
+      <text x="{{ cx }}" y="{{ cy + 44 }}" text-anchor="middle" fill="#5B21B6" font-size="12"
+        font-family="Inter, sans-serif" font-weight="600"
+        style="paint-order:stroke;stroke:#F6F6F6;stroke-width:3px;stroke-linejoin:round;">{{ switch_info.name }}</text>
+      <text x="{{ cx }}" y="{{ cy + 58 }}" text-anchor="middle" fill="#6D6D6D" font-size="10"
         font-family="JetBrains Mono, monospace"
-        style="paint-order:stroke;stroke:#f8fafc;stroke-width:3px;stroke-linejoin:round;">{{ switch_info.host }}</text>
+        style="paint-order:stroke;stroke:#F6F6F6;stroke-width:3px;stroke-linejoin:round;">{{ switch_info.host }}</text>
     </g>
 
     {# ── Node device mengelilingi switch ── #}
@@ -233,12 +227,12 @@
     {% set role_l = device.role | lower %}
     {% if role_l == 'switch' %}
     {% set svg_file = 'workgroup-switch.svg' %}
-    {% set fill_lbl = '#4c1d95' %}
+    {% set fill_lbl = '#5B21B6' %}
     {% set iw = 86 %}
     {% set ih = 56 %}
     {% else %}
     {% set svg_file = 'router.svg' %}
-    {% set fill_lbl = '#1e3a8a' %}
+    {% set fill_lbl = '#1E40AF' %}
     {% set iw = 82 %}
     {% set ih = 56 %}
     {% endif %}
@@ -246,19 +240,14 @@
     {% set ix = (rx - (iw / 2)) | int %}
     {% set iy = (ry - (ih / 2)) | int %}
 
-    {# Label always centered on the node horizontally #}
     {% set label_x = rx | int %}
-    {# Place labels OUTSIDE the icon — top nodes: above icon; bottom nodes: below icon; side nodes: also below #}
     {% if ny <= -0.45 %}
-      {# Node is above center → labels go above the icon top edge #}
       {% set name_y = (iy - 18) | int %}
       {% set host_y = (iy - 5) | int %}
     {% elif ny >= 0.45 %}
-      {# Node is below center → labels go below the icon bottom edge #}
       {% set name_y = (iy + ih + 16) | int %}
       {% set host_y = (iy + ih + 30) | int %}
     {% else %}
-      {# Side nodes (mostly horizontal) → labels go below the icon #}
       {% set name_y = (iy + ih + 14) | int %}
       {% set host_y = (iy + ih + 28) | int %}
     {% endif %}
@@ -266,123 +255,117 @@
       <a href="{{ url_for('device_detail', device_id=device.id) }}" class="topo-node" style="cursor:pointer">
         <image href="{{ url_for('static', filename=svg_file) }}" x="{{ ix }}" y="{{ iy }}" width="{{ iw }}"
           height="{{ ih }}" />
-        <text x="{{ label_x }}" y="{{ name_y }}" text-anchor="middle" fill="{{ fill_lbl }}" font-size="13"
-          font-family="DM Sans, sans-serif" font-weight="700"
-          style="paint-order:stroke;stroke:#f8fafc;stroke-width:3px;stroke-linejoin:round;">
+        <text x="{{ label_x }}" y="{{ name_y }}" text-anchor="middle" fill="{{ fill_lbl }}" font-size="12"
+          font-family="Inter, sans-serif" font-weight="600"
+          style="paint-order:stroke;stroke:#F6F6F6;stroke-width:3px;stroke-linejoin:round;">
           {{ device.name }}
         </text>
-        <text x="{{ label_x }}" y="{{ host_y }}" text-anchor="middle" fill="#64748b" font-size="11"
+        <text x="{{ label_x }}" y="{{ host_y }}" text-anchor="middle" fill="#6D6D6D" font-size="10"
           font-family="JetBrains Mono, monospace"
-          style="paint-order:stroke;stroke:#f8fafc;stroke-width:3px;stroke-linejoin:round;">
+          style="paint-order:stroke;stroke:#F6F6F6;stroke-width:3px;stroke-linejoin:round;">
           {{ device.host }}
         </text>
       </a>
-      {% endfor %}
+    {% endfor %}
 
-      {# ── Label interface di kedua ujung tiap link (switch <-> device) ── #}
-        {% set switch_name_l = switch_info.name | string | lower %}
-        {% for device in inventory %}
-        {% set point = topology_nodes.get(device.id, {'x': cx, 'y': cy, 'nx': 0, 'ny': -1}) %}
-        {% set rx = point.x | int %}
-        {% set ry = point.y | int %}
-        {% set nx = point.nx %}
-        {% set ny = point.ny %}
-        {% set device_id_l = device.id | string | lower %}
-        {% set view = namespace(device_intf='', switch_intf='') %}
+    {# ── Label interface di kedua ujung tiap link ── #}
+    {% set switch_name_l = switch_info.name | string | lower %}
+    {% for device in inventory %}
+    {% set point = topology_nodes.get(device.id, {'x': cx, 'y': cy, 'nx': 0, 'ny': -1}) %}
+    {% set rx = point.x | int %}
+    {% set ry = point.y | int %}
+    {% set nx = point.nx %}
+    {% set ny = point.ny %}
+    {% set device_id_l = device.id | string | lower %}
+    {% set view = namespace(device_intf='', switch_intf='') %}
 
-        {% for link in links %}
-        {% set from_id = link.get('from', '') | string | lower %}
-        {% set to_id = link.get('to', '') | string | lower %}
-        {% if from_id == device_id_l and (to_id == switch_name_l or to_id == 'switch') %}
-        {% set view.device_intf = link.get('from_intf', '') %}
-        {% set view.switch_intf = link.get('to_intf', '') %}
-        {% elif to_id == device_id_l and (from_id == switch_name_l or from_id == 'switch') %}
-        {% set view.device_intf = link.get('to_intf', '') %}
-        {% set view.switch_intf = link.get('from_intf', '') %}
-        {% endif %}
-        {% endfor %}
+    {% for link in links %}
+    {% set from_id = link.get('from', '') | string | lower %}
+    {% set to_id = link.get('to', '') | string | lower %}
+    {% if from_id == device_id_l and (to_id == switch_name_l or to_id == 'switch') %}
+    {% set view.device_intf = link.get('from_intf', '') %}
+    {% set view.switch_intf = link.get('to_intf', '') %}
+    {% elif to_id == device_id_l and (from_id == switch_name_l or from_id == 'switch') %}
+    {% set view.device_intf = link.get('to_intf', '') %}
+    {% set view.switch_intf = link.get('from_intf', '') %}
+    {% endif %}
+    {% endfor %}
 
-        {#
-          Interface labels: place each label on the link line, close to its endpoint.
-          - t=0.30 → 30% of the way from the device toward the switch
-          - t=0.30 → 30% of the way from the switch toward the device
-          - perpendicular nudge = 11px so text floats beside the dashed link
-        #}
-        {% set t = 0.28 %}
-        {# Device-side: from device node toward switch center #}
-        {% set lx_dev = (rx + t * (cx - rx)) | int %}
-        {% set ly_dev = (ry + t * (cy - ry)) | int %}
-        {# Switch-side: from switch center toward device node #}
-        {% set lx_sw = (cx + t * (rx - cx)) | int %}
-        {% set ly_sw = (cy + t * (ry - cy)) | int %}
-        {# Perpendicular unit vector to the link #}
-        {% set px = -ny %}
-        {% set py = nx %}
-        {% set nudge = 11 %}
-        {% set dx = (px * nudge) | int %}
-        {% set dy = (py * nudge) | int %}
+    {% set t = 0.28 %}
+    {% set lx_dev = (rx + t * (cx - rx)) | int %}
+    {% set ly_dev = (ry + t * (cy - ry)) | int %}
+    {% set lx_sw = (cx + t * (rx - cx)) | int %}
+    {% set ly_sw = (cy + t * (ry - cy)) | int %}
+    {% set px = -ny %}
+    {% set py = nx %}
+    {% set nudge = 11 %}
+    {% set dx = (px * nudge) | int %}
+    {% set dy = (py * nudge) | int %}
 
-        {% if view.device_intf %}
-        <text x="{{ lx_dev + dx }}" y="{{ ly_dev + dy }}" text-anchor="middle" fill="#334155" font-size="10"
-          font-family="JetBrains Mono, monospace"
-          style="paint-order:stroke;stroke:#f8fafc;stroke-width:4px;stroke-linejoin:round;font-weight:600;">
-          {{ view.device_intf | replace('FastEthernet', 'e') | replace('Ethernet', 'e') }}
-        </text>
-        {% endif %}
+    {% if view.device_intf %}
+    <text x="{{ lx_dev + dx }}" y="{{ ly_dev + dy }}" text-anchor="middle" fill="#3D3D3D" font-size="10"
+      font-family="JetBrains Mono, monospace"
+      style="paint-order:stroke;stroke:#F6F6F6;stroke-width:4px;stroke-linejoin:round;font-weight:600;">
+      {{ view.device_intf | replace('FastEthernet', 'e') | replace('Ethernet', 'e') }}
+    </text>
+    {% endif %}
 
-        {% if view.switch_intf %}
-        <text x="{{ lx_sw + dx }}" y="{{ ly_sw + dy }}" text-anchor="middle" fill="#334155" font-size="10"
-          font-family="JetBrains Mono, monospace"
-          style="paint-order:stroke;stroke:#f8fafc;stroke-width:4px;stroke-linejoin:round;font-weight:600;">
-          {{ view.switch_intf | replace('FastEthernet', 'e') | replace('Ethernet', 'e') }}
-        </text>
-        {% endif %}
-        {% endfor %}
+    {% if view.switch_intf %}
+    <text x="{{ lx_sw + dx }}" y="{{ ly_sw + dy }}" text-anchor="middle" fill="#3D3D3D" font-size="10"
+      font-family="JetBrains Mono, monospace"
+      style="paint-order:stroke;stroke:#F6F6F6;stroke-width:4px;stroke-linejoin:round;font-weight:600;">
+      {{ view.switch_intf | replace('FastEthernet', 'e') | replace('Ethernet', 'e') }}
+    </text>
+    {% endif %}
+    {% endfor %}
 
   </svg>
   {% endif %}
 
-  <div style="text-align:right; padding:4px 12px 8px; font-size:11px; color:var(--muted);">
+  <div style="text-align:right; padding:4px 12px 8px; font-size:11px; color:var(--muted-light);">
     Klik node untuk buka device
   </div>
 </div>
 
-{# ── Modal Add Device ──────────────────────────────────────── #}
-<div id="addDeviceOverlay"
-  style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; display:none; align-items:center; justify-content:center;">
-  <div
-    style="background:#fff; border-radius:14px; padding:28px 32px; width:480px; max-width:95vw; box-shadow:0 12px 40px rgba(0,0,0,.18);">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-      <h3 style="margin:0; font-size:18px; font-weight:700; color:#1e293b;">Tambah Device Baru</h3>
-      <button type="button" id="btnCloseModal"
-        style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">&times;</button>
+{% else %}
+<div class="card" style="text-align:center; padding:48px;">
+  <div style="display:flex;justify-content:center;margin-bottom:14px;color:var(--muted-light);">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+    </svg>
+  </div>
+  <p class="muted">Tidak ada perangkat di inventory.</p>
+</div>
+{% endif %}
+
+<!-- Add Device Modal -->
+<div id="addDeviceOverlay" class="modal-overlay" style="display:none;">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <h3>Tambah Device Baru</h3>
+      <button type="button" class="modal-close" id="btnCloseModal">&#10005;</button>
     </div>
     <form id="addDeviceForm">
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">Device ID *</label>
-          <input name="id" required placeholder="r4"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label>Device ID *</label>
+          <input name="id" required placeholder="r4">
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">Name</label>
-          <input name="name" placeholder="router4"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        <div class="form-group">
+          <label>Name</label>
+          <input name="name" placeholder="router4">
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">IP Address *</label>
-          <input name="host" required placeholder="192.168.56.14"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        <div class="form-group">
+          <label>IP Address *</label>
+          <input name="host" required placeholder="192.168.56.14">
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">SSH Port</label>
-          <input name="port" type="number" value="22" min="1" max="65535"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        <div class="form-group">
+          <label>SSH Port</label>
+          <input name="port" type="number" value="22" min="1" max="65535">
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">Device Type</label>
-          <select name="device_type"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;">
+        <div class="form-group">
+          <label>Device Type</label>
+          <select name="device_type">
             <option value="cisco_ios" selected>cisco_ios</option>
             <option value="cisco_xe">cisco_xe</option>
             <option value="cisco_xr">cisco_xr</option>
@@ -392,10 +375,9 @@
             <option value="linux">linux</option>
           </select>
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">Role</label>
-          <select name="role"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;">
+        <div class="form-group">
+          <label>Role</label>
+          <select name="role">
             <option value="router" selected>router</option>
             <option value="switch">switch</option>
             <option value="firewall">firewall</option>
@@ -403,55 +385,39 @@
           </select>
         </div>
       </div>
-      <hr style="margin:16px 0; border:none; border-top:1px solid #e2e8f0;">
-      <p style="font-size:12px;font-weight:600;color:#334155;margin:0 0 8px;">Koneksi Topologi (Perangkat baru ke
-        tujuan)
-      </p>
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">Perangkat Dst.</label>
-          <input name="connected_to" value="switch"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+      <hr style="margin:16px 0;">
+      <p style="font-size:12px;font-weight:600;color:var(--text-2);margin:0 0 10px;">Koneksi Topologi (Perangkat baru ke tujuan)</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label>Perangkat Dst.</label>
+          <input name="connected_to" value="switch">
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">Interface Src.</label>
-          <input name="local_intf" placeholder="contoh: Ethernet0/0 (r4)"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        <div class="form-group">
+          <label>Interface Src.</label>
+          <input name="local_intf" placeholder="Ethernet0/0">
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#475569;">Interface Dst.</label>
-          <input name="remote_intf" placeholder="contoh: Ethernet0/4 (switch)"
-            style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+        <div class="form-group">
+          <label>Interface Dst.</label>
+          <input name="remote_intf" placeholder="Ethernet0/4">
         </div>
       </div>
-      <div style="margin-top:18px; text-align:right;">
-        <button type="button" id="btnCancelModal"
-          style="padding:8px 18px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#475569;font-size:13px;cursor:pointer;margin-right:8px;">Batal</button>
-        <button type="submit"
-          style="padding:8px 22px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>
+      <div class="actions actions-end" style="margin-top:20px;">
+        <button type="button" class="secondary" id="btnCancelModal">Batal</button>
+        <button type="submit">Simpan</button>
       </div>
       <p id="addDeviceMsg" style="margin:10px 0 0;font-size:12px;display:none;"></p>
     </form>
   </div>
 </div>
 
-
-
-{% else %}
-<div class="card" style="text-align:center; padding:48px;">
-  <p style="font-size:32px; margin-bottom:12px;">📭</p>
-  <p class="muted">Tidak ada perangkat di inventory.</p>
-</div>
-{% endif %}
-
 <!-- Quick Connect -->
 <div class="qc-section">
   <div class="qc-header">
     <div class="qc-badge">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
         stroke-linecap="round">
-        <path d="M5 12h14" />
-        <path d="M12 5l7 7-7 7" />
+        <path d="M5 12h14"/>
+        <path d="M12 5l7 7-7 7"/>
       </svg>
       Quick Connect
     </div>
@@ -499,10 +465,10 @@
     <div class="actions actions-end" style="margin-top:14px;">
       <button type="submit">
         Connect
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
           stroke-linecap="round">
-          <path d="M5 12h14" />
-          <path d="M12 5l7 7-7 7" />
+          <path d="M5 12h14"/>
+          <path d="M12 5l7 7-7 7"/>
         </svg>
       </button>
     </div>
@@ -577,17 +543,17 @@
         .then(function (data) {
           msg.style.display = "block";
           if (data.ok) {
-            msg.style.color = "#16a34a";
+            msg.style.color = "var(--success)";
             msg.textContent = data.message;
             setTimeout(function () { location.reload(); }, 800);
           } else {
-            msg.style.color = "#dc2626";
+            msg.style.color = "var(--danger)";
             msg.textContent = data.message || "Gagal menambahkan device.";
           }
         })
         .catch(function (err) {
           msg.style.display = "block";
-          msg.style.color = "#dc2626";
+          msg.style.color = "var(--danger)";
           msg.textContent = "Network error: " + err.message;
         });
     });

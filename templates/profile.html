@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+  <a href="{{ url_for('dashboard') }}">Overview</a>
+  <span class="breadcrumb-sep">/</span>
+  <span class="breadcrumb-cur">Profile</span>
+</div>
+
+<!-- Page header -->
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Profile</h1>
+    <p class="page-subtitle">Kelola informasi akun web panel.</p>
+  </div>
+</div>
+
+<!-- Profile Card -->
+<div class="card" style="max-width:600px;">
+  <div style="display:flex; gap:32px; align-items:flex-start;">
+
+    <!-- Avatar -->
+    <div class="avatar-wrap" id="avatarWrap" title="Klik untuk ganti foto">
+      {% if avatar %}
+      <img src="{{ url_for('static', filename='uploads/' + avatar) }}"
+           alt="Avatar" class="profile-avatar" id="avatarDisplay">
+      {% else %}
+      <div class="profile-avatar-placeholder" id="avatarDisplay">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      {% endif %}
+      <div class="avatar-overlay">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span>Edit</span>
+      </div>
+      <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+    </div>
+
+    <!-- Fields -->
+    <div class="profile-fields" style="flex:1;">
+
+      <!-- Username -->
+      <div class="profile-field" id="row-username">
+        <span class="profile-field-label">User</span>
+        <span class="profile-field-sep">:</span>
+        <span class="profile-field-value" id="val-username">{{ username }}</span>
+        <button class="profile-edit-btn" id="btn-edit-username"
+          onclick="startEdit('username')" title="Edit username">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <div class="profile-inline-edit" id="edit-username" style="display:none;">
+          <input type="text" class="profile-inline-input" id="input-username"
+            value="{{ username }}" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="profile-field" id="row-password">
+        <span class="profile-field-label">Password</span>
+        <span class="profile-field-sep">:</span>
+        <span class="profile-field-value masked" id="val-password">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span>
+        <button class="profile-edit-btn" id="btn-edit-password"
+          onclick="startEdit('password')" title="Edit password">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <div class="profile-inline-edit" id="edit-password" style="display:none;">
+          <input type="password" class="profile-inline-input" id="input-password"
+            placeholder="Password baru" autocomplete="new-password">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Shared Cancel / Save — appears for field edits OR pending avatar -->
+  <div id="profile-actions" class="actions actions-end"
+       style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+    <button type="button" class="secondary" onclick="cancelAll()">Cancel</button>
+    <button type="button" onclick="saveAll()">Save</button>
+  </div>
+</div>
+
+<!-- Crop Modal — only Batal; confirm happens via card Save button -->
+<div id="cropModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:500px; width:100%;">
+    <div class="modal-header">
+      <h3>Crop Foto</h3>
+      <button class="modal-close" onclick="cancelCrop()">&#10005;</button>
+    </div>
+    <p class="muted" style="margin-bottom:12px; font-size:12px;">
+      Sesuaikan area crop, lalu tekan <strong>Save</strong> di bawah untuk menyimpan.
+    </p>
+    <div style="max-height:400px; overflow:hidden; background:#111; border-radius:4px; margin-bottom:16px;">
+      <img id="cropImage" style="max-width:100%; display:block;">
+    </div>
+    <div class="actions actions-end">
+      <button type="button" class="secondary" onclick="cancelCrop()">Batal</button>
+      <button type="button" onclick="confirmCrop()">Konfirmasi Crop</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+<script>
+  var CSRF_TOKEN  = document.querySelector('meta[name="csrf-token"]').content;
+  var _activeField      = null;   /* which field is being edited */
+  var _cropper          = null;   /* active Cropper instance */
+  var _pendingAvatarBlob = null;  /* cropped/selected blob waiting for Save */
+  var _originalAvatarSrc = null;  /* previous avatar src for revert on Cancel */
+
+  /* ────────────────────────────────────────────────────────
+     Field editing
+  ──────────────────────────────────────────────────────── */
+  function startEdit(field) {
+    if (_activeField && _activeField !== field) _collapseField(_activeField);
+    _activeField = field;
+    document.getElementById("val-" + field).style.display      = "none";
+    document.getElementById("btn-edit-" + field).style.display = "none";
+    document.getElementById("edit-" + field).style.display     = "flex";
+    _showActions();
+    var input = document.getElementById("input-" + field);
+    input.focus();
+    if (field === "password") input.value = "";
+  }
+
+  function _collapseField(field) {
+    document.getElementById("edit-" + field).style.display     = "none";
+    document.getElementById("val-" + field).style.display      = "";
+    document.getElementById("btn-edit-" + field).style.display = "";
+    if (field === "password") document.getElementById("input-password").value = "";
+  }
+
+  function _showActions() {
+    document.getElementById("profile-actions").style.display = "flex";
+  }
+
+  function _hideActions() {
+    if (!_activeField && !_pendingAvatarBlob)
+      document.getElementById("profile-actions").style.display = "none";
+  }
+
+  function cancelAll() {
+    /* Revert field */
+    if (_activeField) { _collapseField(_activeField); _activeField = null; }
+    /* Revert avatar preview */
+    if (_pendingAvatarBlob) {
+      _pendingAvatarBlob = null;
+      var display = document.getElementById("avatarDisplay");
+      if (_originalAvatarSrc) {
+        if (display.tagName !== "IMG") {
+          var img = document.createElement("img");
+          img.className = "profile-avatar"; img.id = "avatarDisplay"; img.alt = "Avatar";
+          display.parentNode.replaceChild(img, display);
+          display = img;
+        }
+        display.src = _originalAvatarSrc;
+      }
+      _originalAvatarSrc = null;
+    }
+    document.getElementById("profile-actions").style.display = "none";
+  }
+
+  function saveAll() {
+    var uploadPromise = _pendingAvatarBlob ? _uploadPending() : Promise.resolve(null);
+    uploadPromise.then(function() {
+      if (_activeField) _saveField(_activeField);
+      else _hideActions();
+    });
+  }
+
+  function _saveField(field) {
+    var input = document.getElementById("input-" + field);
+    var value = input.value.trim();
+    if (!value) { showToast("Value tidak boleh kosong.", "error"); return; }
+    var fd = new FormData();
+    fd.append("field", field); fd.append("value", value); fd.append("csrf_token", CSRF_TOKEN);
+    fetch("{{ url_for('profile_save') }}", {
+      method: "POST", headers: { "X-CSRFToken": CSRF_TOKEN }, body: fd,
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.ok) {
+        if (field === "username") document.getElementById("val-username").textContent = value;
+        _collapseField(field); _activeField = null;
+        document.getElementById("profile-actions").style.display = "none";
+        showToast(field === "username" ? "Username diperbarui." : "Password diperbarui.", "success");
+      } else { showToast(data.message || "Gagal menyimpan.", "error"); }
+    }).catch(function() { showToast("Gagal menyimpan.", "error"); });
+  }
+
+  /* Enter / Escape shortcuts */
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      var a = document.activeElement;
+      if (a && a.classList.contains("profile-inline-input")) saveAll();
+    }
+    if (e.key === "Escape" && _activeField) cancelAll();
+  });
+
+  /* ────────────────────────────────────────────────────────
+     Avatar — select & crop
+  ──────────────────────────────────────────────────────── */
+  var avatarWrap  = document.getElementById("avatarWrap");
+  var avatarInput = document.getElementById("avatarInput");
+  var cropModal   = document.getElementById("cropModal");
+  var cropImage   = document.getElementById("cropImage");
+
+  avatarWrap.addEventListener("click", function() { avatarInput.click(); });
+
+  avatarInput.addEventListener("change", function() {
+    var file = this.files[0];
+    if (!file) return;
+    this.value = "";
+
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image();
+      img.onload = function() {
+        if (img.width === img.height) {
+          /* Square — skip cropper, use directly */
+          _setPendingBlob(file);
+          _previewBlob(file);
+        } else {
+          _openCropModal(ev.target.result);
+        }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function _openCropModal(src) {
+    cropModal.style.display = "flex";
+    cropImage.src = "";
+    /* Wait for img element to load the new src */
+    cropImage.onload = function() {
+      if (_cropper) { _cropper.destroy(); _cropper = null; }
+      _cropper = new Cropper(cropImage, {
+        aspectRatio: 1,
+        viewMode: 1,
+        dragMode: "move",
+        autoCropArea: 0.9,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+      });
+    };
+    cropImage.src = src;
+  }
+
+  function cancelCrop() {
+    cropModal.style.display = "none";
+    if (_cropper) { _cropper.destroy(); _cropper = null; }
+    cropImage.src = "";
+  }
+
+  function confirmCrop() {
+    if (!_cropper) return;
+    _cropper.getCroppedCanvas({ width: 512, height: 512 }).toBlob(function(blob) {
+      cancelCrop();
+      var file = new File([blob], "avatar.png", { type: "image/png" });
+      _setPendingBlob(file);
+      _previewBlob(file);
+    }, "image/png");
+  }
+
+  function _setPendingBlob(file) {
+    /* Save current avatar src so Cancel can revert */
+    var display = document.getElementById("avatarDisplay");
+    if (!_originalAvatarSrc)
+      _originalAvatarSrc = display.tagName === "IMG" ? display.src : null;
+    _pendingAvatarBlob = file;
+    _showActions();
+  }
+
+  function _previewBlob(file) {
+    var url = URL.createObjectURL(file);
+    var display = document.getElementById("avatarDisplay");
+    if (display.tagName === "DIV") {
+      var img = document.createElement("img");
+      img.className = "profile-avatar"; img.id = "avatarDisplay"; img.alt = "Avatar";
+      display.parentNode.replaceChild(img, display);
+      display = img;
+    }
+    display.src = url;
+  }
+
+  function _uploadPending() {
+    var file = _pendingAvatarBlob;
+    _pendingAvatarBlob = null;
+    _originalAvatarSrc = null;
+
+    var fd = new FormData();
+    fd.append("avatar", file); fd.append("csrf_token", CSRF_TOKEN);
+    return fetch("{{ url_for('profile_avatar') }}", {
+      method: "POST", headers: { "X-CSRFToken": CSRF_TOKEN }, body: fd,
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.ok) {
+        /* Refresh display to server url (avoids blob: urls) */
+        var display = document.getElementById("avatarDisplay");
+        display.src = data.url + "?t=" + Date.now();
+        /* Update topbar */
+        var ta = document.querySelector(".topbar-avatar");
+        if (ta) {
+          var taImg = ta.querySelector("img");
+          if (taImg) { taImg.src = data.url + "?t=" + Date.now(); }
+          else {
+            var ni = document.createElement("img");
+            ni.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+            ni.alt = "Avatar"; ni.src = data.url + "?t=" + Date.now();
+            ta.innerHTML = ""; ta.appendChild(ni);
+          }
+        }
+        showToast("Foto profil diperbarui.", "success");
+      } else { showToast(data.message || "Gagal upload foto.", "error"); }
+    }).catch(function() { showToast("Gagal upload foto.", "error"); });
+  }
+
+  /* Click outside crop modal */
+  cropModal.addEventListener("click", function(e) {
+    if (e.target === cropModal) cancelCrop();
+  });
+</script>
+{% endblock %}
