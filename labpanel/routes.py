@@ -120,26 +120,30 @@ def register_routes(app):
             "switch", {"name": "switch", "host": ""})
 
         # Check real device connectivity secara paralel (threading)
-        default_username = current_app.config["LAB_DEVICE_USERNAME"]
-        default_password = current_app.config["LAB_DEVICE_PASSWORD"]
-        default_secret = current_app.config["LAB_DEVICE_SECRET"]
+        # default_username = current_app.config["LAB_DEVICE_USERNAME"]
+        # default_password = current_app.config["LAB_DEVICE_PASSWORD"]
+        # default_secret = current_app.config["LAB_DEVICE_SECRET"]
 
-        def _check(device):
-            if device.get("enabled"):
-                return device, check_device_reachable(
-                    device,
-                    username=default_username,
-                    password=default_password,
-                    secret=default_secret,
-                    timeout=3.5,
-                )
-            return device, "offline"
+        # def _check(device):
+        #     if device.get("enabled"):
+        #         return device, check_device_reachable(
+        #             device,
+        #             username=default_username,
+        #             password=default_password,
+        #             secret=default_secret,
+        #             timeout=3.5,
+        #         )
+        #     return device, "offline"
 
-        with ThreadPoolExecutor(max_workers=len(devices) or 1) as pool:
-            futures = {pool.submit(_check, d): d for d in devices}
-            for future in as_completed(futures):
-                dev, status = future.result()
-                dev["status"] = status
+        # with ThreadPoolExecutor(max_workers=len(devices) or 1) as pool:
+        #     futures = {pool.submit(_check, d): d for d in devices}
+        #     for future in as_completed(futures):
+        #         dev, status = future.result()
+        #         dev["status"] = status
+        
+        # UI DEV: set status offline by default to avoid polling delay
+        for dev in devices:
+            dev["status"] = "offline"
 
         # Layout topologi dinamis: tetap rapi walau jumlah router bertambah.
         topo_cx, topo_cy, topo_radius = 250, 195, 116
@@ -231,11 +235,14 @@ def register_routes(app):
                 # Balik ke halaman buat nampilin flag konfirmasi
                 username, password, secret = _get_device_credentials(device_id)
                 try:
-                    interfaces, raw_output = get_interface_summary(
-                        device, username=username, password=password, secret=secret,
-                        host=connection["host"], port=connection["port"],
-                        device_type=connection["device_type"],
-                    )
+                    # UI DEV: disabled polling
+                    # interfaces, raw_output = get_interface_summary(
+                    #     device, username=username, password=password, secret=secret,
+                    #     host=connection["host"], port=connection["port"],
+                    #     device_type=connection["device_type"],
+                    # )
+                    interfaces = []
+                    raw_output = "Dummy Interface Output (UI DEV)"
                     connected = True
                 except (automation.ConnectionError, ValueError) as exc:
                     error = str(exc)
@@ -291,15 +298,18 @@ def register_routes(app):
         username, password, secret = _get_device_credentials(device_id)
         if not error:
             try:
-                interfaces, raw_output = get_interface_summary(
-                    device,
-                    username=username,
-                    password=password,
-                    secret=secret,
-                    host=connection["host"],
-                    port=connection["port"],
-                    device_type=connection["device_type"],
-                )
+                # UI DEV: disabled polling
+                # interfaces, raw_output = get_interface_summary(
+                #     device,
+                #     username=username,
+                #     password=password,
+                #     secret=secret,
+                #     host=connection["host"],
+                #     port=connection["port"],
+                #     device_type=connection["device_type"],
+                # )
+                interfaces = []
+                raw_output = "Dummy Interface Output (UI DEV)"
                 connected = True
             except (automation.ConnectionError, ValueError) as exc:
                 error = str(exc)
@@ -383,15 +393,18 @@ def register_routes(app):
                             f"Aksi '{action}' pada {ad_hoc_id}/{interface} berhasil.", "success")
 
             if not error:
-                interfaces, raw_output = get_interface_summary(
-                    transient_device,
-                    username=username,
-                    password=password,
-                    secret=secret,
-                    host=connection["host"],
-                    port=connection["port"],
-                    device_type=connection["device_type"],
-                )
+                # UI DEV: disabled polling
+                # interfaces, raw_output = get_interface_summary(
+                #     transient_device,
+                #     username=username,
+                #     password=password,
+                #     secret=secret,
+                #     host=connection["host"],
+                #     port=connection["port"],
+                #     device_type=connection["device_type"],
+                # )
+                interfaces = []
+                raw_output = "Dummy Interface Output (UI DEV)"
                 connected = True
         except (automation.ConnectionError, ActionError, ValueError) as exc:
             error = str(exc)
@@ -421,25 +434,29 @@ def register_routes(app):
         results = None
 
         # Check real device connectivity secara paralel (threading) agar status di cards valid
-        default_username = current_app.config["LAB_DEVICE_USERNAME"]
-        default_password = current_app.config["LAB_DEVICE_PASSWORD"]
-        default_secret = current_app.config["LAB_DEVICE_SECRET"]
+        # default_username = current_app.config["LAB_DEVICE_USERNAME"]
+        # default_password = current_app.config["LAB_DEVICE_PASSWORD"]
+        # default_secret = current_app.config["LAB_DEVICE_SECRET"]
 
-        def _check(device):
-            if device.get("enabled"):
-                return device, check_device_reachable(
-                    device,
-                    username=default_username,
-                    password=default_password,
-                    secret=default_secret,
-                )
-            return device, "offline"
+        # def _check(device):
+        #     if device.get("enabled"):
+        #         return device, check_device_reachable(
+        #             device,
+        #             username=default_username,
+        #             password=default_password,
+        #             secret=default_secret,
+        #         )
+        #     return device, "offline"
 
-        with ThreadPoolExecutor(max_workers=len(inventory) or 1) as pool:
-            futures = {pool.submit(_check, d): d for d in inventory}
-            for future in as_completed(futures):
-                dev, status = future.result()
-                dev["status"] = status
+        # with ThreadPoolExecutor(max_workers=len(inventory) or 1) as pool:
+        #     futures = {pool.submit(_check, d): d for d in inventory}
+        #     for future in as_completed(futures):
+        #         dev, status = future.result()
+        #         dev["status"] = status
+        
+        # UI DEV: set status offline by default to avoid polling delay
+        for dev in inventory:
+            dev["status"] = "offline"
 
         if request.method == "POST":
             # Batch pake kredensial global session (admin set sekali dari modal seting di Dashboard)
