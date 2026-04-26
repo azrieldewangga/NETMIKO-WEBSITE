@@ -591,6 +591,19 @@ def register_routes(app):
 
         return jsonify({"ok": True})
 
+    @app.route("/profile/avatar/delete", methods=["POST"])
+    @login_required
+    def profile_avatar_delete():
+        """Hapus foto profil — buang file dari disk dan kosongkan field avatar di profile.json."""
+        data = _load_profile()
+        old_filename = data.pop("avatar", None)
+        _save_profile(data)
+        if old_filename:
+            old_path = Path(current_app.config["UPLOAD_FOLDER"]) / old_filename
+            if old_path.exists():
+                old_path.unlink()
+        return jsonify({"ok": True})
+
     @app.route("/profile/avatar", methods=["POST"])
     @login_required
     def profile_avatar():
