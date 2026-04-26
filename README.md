@@ -1,10 +1,10 @@
-# 🌐 Topology-Aware Web Panel
+# NetPanel
 
-Web dashboard berbasis **Flask** untuk mengelola perangkat jaringan **Cisco IOS** secara remote via SSH — tanpa perlu buka terminal. Dibuat sebagai bagian dari seri *YouTube Network Automation*.
+Web dashboard berbasis **Flask** untuk mengelola perangkat jaringan **Cisco IOS** secara remote via SSH — tanpa perlu buka terminal. 
 
 ---
 
-## 📋 Fitur
+##  Fitur
 
 | Fitur | Keterangan |
 |---|---|
@@ -19,7 +19,7 @@ Web dashboard berbasis **Flask** untuk mengelola perangkat jaringan **Cisco IOS*
 
 ---
 
-## 🗂️ Struktur Proyek
+##  Struktur Proyek
 
 ```
 .11.Topology_Aware_Web_Panel/
@@ -40,7 +40,7 @@ Web dashboard berbasis **Flask** untuk mengelola perangkat jaringan **Cisco IOS*
 
 ---
 
-## ⚙️ Instalasi & Menjalankan
+##  Instalasi & Menjalankan
 
 ### 1. Install dependensi
 
@@ -85,7 +85,7 @@ python app.py
 
 ---
 
-## 📦 Inventory Device
+##  Inventory Device
 
 Device dikelola di `inventory.json`. Tambahkan device baru dengan format:
 
@@ -117,7 +117,7 @@ Device dikelola di `inventory.json`. Tambahkan device baru dengan format:
 
 ---
 
-## 🔄 Alur Kerja Aplikasi
+##  Alur Kerja Aplikasi
 
 ```
 Browser → Login → Dashboard (daftar inventory)
@@ -135,7 +135,7 @@ Browser → Login → Dashboard (daftar inventory)
 
 ---
 
-## 🔒 Keamanan
+##  Keamanan
 
 - **CSRF Protection** via `Flask-WTF` (token di setiap form POST)
 - **Sanitasi input CLI** — karakter seperti `;`, `|`, `&`, newline diblokir
@@ -144,7 +144,7 @@ Browser → Login → Dashboard (daftar inventory)
 
 ---
 
-## 📝 Format Batch Actions
+##  Format Batch Actions
 
 Setiap baris di halaman Batch menggunakan format:
 
@@ -170,7 +170,7 @@ r1,     ,                   ssh_port,    2222
 
 ---
 
-## 🧰 Teknologi
+##  Teknologi
 
 - **Python 3.10+**
 - **Flask** — web framework
@@ -179,34 +179,3 @@ r1,     ,                   ssh_port,    2222
 
 ---
 
-## 🚫 Yang Tidak Boleh Di-push Ke Git Public
-
-- File rahasia lokal: `.secret_key`, `.env`, `.env.*`
-- File log runtime: `logs/*.log`
-- Cache build Python: `__pycache__/`, `*.pyc`
-- File lokal editor/agent: `.claude/settings.local.json`, `.vscode/`, `.idea/`
-
-Semua pola di atas sudah dimasukkan ke `.gitignore`.
-
-### Kalau sudah terlanjur ke-track Git
-
-Jalankan perintah ini sekali untuk melepas dari tracking (file lokal tetap ada):
-
-```bash
-git rm --cached .secret_key
-git rm --cached -r __pycache__ labpanel/__pycache__
-git rm --cached logs/*.log
-git rm --cached .claude/settings.local.json
-git add .gitignore
-git commit -m "chore: ignore local secrets and runtime artifacts"
-```
-
----
-
-## ✅ Agar Clone di VM Tidak Rusak
-
-1. Clone repo biasa.
-2. Atur environment variable di VM (lihat bagian Instalasi).
-3. Jalankan aplikasi; file `.secret_key` dan folder `logs/` akan dibuat otomatis jika belum ada.
-
-Dengan pola ini, repo aman untuk public, tapi tetap langsung bisa dipakai di mesin baru.
