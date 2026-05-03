@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,8 @@ BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_INVENTORY_PATH = BASE_DIR / "inventory.json"
 LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
+
+_log_locks: dict[str, threading.Lock] = {}
 
 
 # ── Custom Exceptions ─────────────────────────────────────────────────────────
@@ -678,3 +681,144 @@ def execute_batch(
                     }
                 )
     return results
+
+
+# ── Activity Logging ──────────────────────────────────────────────────────────
+
+def log_activity(device_id: str, level: str, action: str, detail: str, user: str | None = None) -> None:
+    """Catat event ke logs/activity_<device_id>.json, thread-safe, max 500 entri."""
+    if device_id not in _log_locks:
+        _log_locks[device_id] = threading.Lock()
+    lock = _log_locks[device_id]
+    log_path = LOGS_DIR / f"activity_{device_id}.json"
+    entry = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "level": level,
+        "action": action,
+        "detail": detail,
+        "user": user,
+    }
+    with lock:
+        try:
+            entries = json.loads(log_path.read_text(encoding="utf-8")) if log_path.exists() else []
+        except (json.JSONDecodeError, OSError):
+            entries = []
+        entries.append(entry)
+        if len(entries) > 500:
+            entries = entries[-500:]
+        log_path.write_text(json.dumps(entries, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def get_activity_log(device_id: str, limit: int = 100) -> list[dict]:
+    """Baca log aktivitas device, return limit entri terbaru (newest first)."""
+    log_path = LOGS_DIR / f"activity_{device_id}.json"
+    if not log_path.exists():
+        return []
+    try:
+        entries = json.loads(log_path.read_text(encoding="utf-8"))
+        return list(reversed(entries[-limit:]))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+# ── Terminal Command Execution ────────────────────────────────────────────────
+
+def execute_terminal_command(
+    device: dict[str, Any],
+    username: str,
+    password: str,
+    command: str,
+    secret: str | None = None,
+) -> str:
+    """Eksekusi satu perintah di device via SSH, return raw output string."""
+    cleaned = sanitize_cli_value(command)
+    if not cleaned:
+        raise ActionError("Command tidak boleh kosong.")
+    connection = connect_device(device, username, password, secret)
+    try:
+        return connection.send_command(cleaned)
+    finally:
+        connection.disconnect()
+
+
+# ── Enhanced Device Detail ────────────────────────────────────────────────────
+
+def _parse_show_version(output: str) -> dict:
+    """Ekstrak uptime, IOS version, hardware, dan serial dari output show version."""
+    uptime_m = re.search(r"uptime is (.+)", output, re.IGNORECASE)
+    ios_m = re.search(r"Version\s+([\w.()\-]+)", output, re.IGNORECASE)
+    hw_m = re.search(r"[Cc]isco\s+(\S+)\s.*[Pp]rocessor", output)
+    serial_m = re.search(r"[Pp]rocessor [Bb]oard ID\s+(\S+)", output)
+    return {
+        "uptime": uptime_m.group(1).strip() if uptime_m else "unknown",
+        "ios_version": ios_m.group(1).strip() if ios_m else "unknown",
+        "hardware": hw_m.group(1).strip() if hw_m else "unknown",
+        "serial": serial_m.group(1).strip() if serial_m else "unknown",
+    }
+
+
+def _parse_route_count(output: str) -> int:
+    """Ambil total route count dari output show ip route summary."""
+    for line in output.splitlines():
+        if "Total" in line:
+            parts = line.split()
+            for part in reversed(parts):
+                if part.isdigit():
+                    return int(part)
+    return 0
+
+
+def get_device_detail(
+    device: dict[str, Any],
+    username: str,
+    password: str,
+    secret: str | None = None,
+) -> dict[str, Any]:
+    """
+    Ambil detail lengkap device dalam 1 sesi SSH:
+    show version + show ip interface brief + show ip route summary.
+    """
+    result: dict[str, Any] = {
+        "uptime": "unknown",
+        "ios_version": "unknown",
+        "hardware": "unknown",
+        "serial": "unknown",
+        "interfaces": [],
+        "route_count": 0,
+        "raw_version": "",
+        "checked_at": datetime.now().isoformat(timespec="seconds"),
+        "error": "",
+    }
+    connection = None
+    try:
+        connection = connect_device(device, username, password, secret)
+
+        raw_version = connection.send_command("show version")
+        result["raw_version"] = raw_version
+        result.update(_parse_show_version(raw_version))
+
+        try:
+            parsed_intf = connection.send_command("show ip interface brief", use_textfsm=True)
+            raw_intf = connection.send_command("show ip interface brief")
+            if isinstance(parsed_intf, list) and parsed_intf:
+                result["interfaces"] = [_normalize_textfsm_row(r) for r in parsed_intf]
+            else:
+                result["interfaces"] = _parse_interface_brief_fallback(raw_intf)
+        except Exception:
+            result["interfaces"] = []
+
+        try:
+            route_out = connection.send_command("show ip route summary")
+            result["route_count"] = _parse_route_count(route_out)
+        except Exception:
+            result["route_count"] = 0
+
+    except ConnectionError as exc:
+        result["error"] = str(exc)
+    finally:
+        if connection:
+            try:
+                connection.disconnect()
+            except Exception:
+                pass
+    return result

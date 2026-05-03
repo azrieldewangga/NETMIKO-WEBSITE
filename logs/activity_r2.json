@@ -1,0 +1,9 @@
+[
+  {
+    "timestamp": "2026-05-03T20:16:18",
+    "level": "WARNING",
+    "action": "connectivity_check",
+    "detail": "offline",
+    "user": null
+  }
+]

@@ -1188,6 +1188,21 @@ tr.row-fail:hover td { background: rgba(255, 234, 234, .9) !important; }
 .grid-7-5 { display: grid; grid-template-columns: 7fr 5fr;         gap: 18px; align-items: start; }
 .grid-5-7 { display: grid; grid-template-columns: 5fr 7fr;         gap: 18px; align-items: start; }
 
+/* ── DEVICE PAGE: top row (SSH Cred + Konfigurasi Interface) — equal height ── */
+.device-top-row {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+.device-top-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+}
+
 /* ── QUICK CONNECT ───────────────────────────────────── */
 .qc-section {
   background: var(--surface);
@@ -1288,7 +1303,8 @@ hr {
 /* ── RESPONSIVE ──────────────────────────────────────── */
 @media (max-width: 1000px) {
   .grid-7-5,
-  .grid-5-7 {
+  .grid-5-7,
+  .device-top-row {
     grid-template-columns: 1fr;
   }
 }
@@ -1479,6 +1495,109 @@ hr {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(0, 81, 195, .12);
 }
+
+/* ── SHIMMER LOADING TEXT ────────────────────────────── */
+.shimmer-text {
+  color: var(--muted-light);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  animation: shimmer-fade 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer-fade {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 1; }
+}
+
+/* ── TERMINAL OUTPUT ─────────────────────────────────── */
+.terminal-output {
+  background: #0D0D0D;
+  color: #4ADE80;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 14px 16px;
+  min-height: 420px;
+  max-height: 560px;
+  overflow-y: auto;
+  line-height: 1.65;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.term-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.term-cmd    { color: #86EFAC; opacity: 0.75; }
+.term-output { color: #4ADE80; }
+.term-error  { color: #F87171; }
+
+.term-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-top: 1px solid #1F1F1F;
+  background: #0D0D0D;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+
+.term-prompt {
+  color: #4ADE80;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.term-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #E2E8F0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 0;
+  outline: none;
+  caret-color: #4ADE80;
+  width: 0;
+}
+
+.term-input::placeholder { color: #374151; }
+.term-input:disabled     { opacity: 0.45; cursor: not-allowed; }
+
+/* ── ACTIVITY LOG PANEL ──────────────────────────────── */
+.activity-log-panel {
+  background: #0D0D0D;
+  color: #D4D4D4;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 12px 14px;
+  max-height: 340px;
+  overflow-y: auto;
+  border-radius: var(--r);
+  border: 1px solid #1F1F1F;
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.log-ts      { color: #4B5563; flex-shrink: 0; }
+.log-level   { font-weight: 700; padding: 0 4px; border-radius: 3px; flex-shrink: 0; }
+.log-INFO    { color: #60A5FA; }
+.log-WARNING { color: #FBBF24; }
+.log-ERROR   { color: #F87171; }
+.log-action  { color: #A78BFA; flex-shrink: 0; }
 
 /* ── SCROLLBAR ───────────────────────────────────────── */
 ::-webkit-scrollbar {

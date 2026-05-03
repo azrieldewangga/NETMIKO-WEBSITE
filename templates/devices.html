@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Devices</h1>
+    <p class="page-subtitle">Status real-time semua perangkat</p>
+  </div>
+  <button onclick="refreshAll()" class="secondary small" id="btnRefreshAll">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+      stroke-linecap="round">
+      <polyline points="1 4 1 10 7 10" />
+      <path d="M3.51 15a9 9 0 1 0 .49-3.5" />
+    </svg>
+    Refresh All
+  </button>
+</div>
+
+{% if inventory %}
+<div class="card" style="padding:0;overflow:hidden;">
+  <div class="table-wrap">
+    <table id="devicesTable">
+      <thead>
+        <tr>
+          <th>Perangkat</th>
+          <th>Uptime</th>
+          <th>IOS Version</th>
+          <th>Hardware</th>
+          <th style="text-align:center;">Routes</th>
+          <th>Interfaces</th>
+          <th style="text-align:right;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for dev in inventory %}
+        <tr id="row-{{ dev.id }}" data-device-id="{{ dev.id }}">
+          <td style="min-width:160px;">
+            <div style="font-weight:600;font-size:13px;color:var(--text);">{{ dev.name }}</div>
+            <div style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-top:2px;">
+              {{ dev.host }}:{{ dev.port }}
+              <span
+                style="margin-left:4px;padding:1px 5px;background:var(--surface-2);border:1px solid var(--border);border-radius:3px;">{{
+                dev.role }}</span>
+            </div>
+          </td>
+          <td class="col-uptime" style="min-width:120px;"><span class="shimmer-text">···</span></td>
+          <td class="col-ios" style="min-width:110px;"><span class="shimmer-text">···</span></td>
+          <td class="col-hw" style="min-width:110px;"><span class="shimmer-text">···</span></td>
+          <td class="col-routes" style="text-align:center;min-width:70px;"><span class="shimmer-text">···</span></td>
+          <td class="col-ifaces" style="min-width:260px;"><span class="shimmer-text">···</span></td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a href="{{ url_for('device_detail', device_id=dev.id) }}" class="button secondary small">
+              Config
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="card" style="text-align:center;padding:48px 24px;">
+  <div style="color:var(--muted-light);margin-bottom:12px;">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+      stroke-linecap="round">
+      <rect x="2" y="2" width="20" height="8" rx="2" />
+      <rect x="2" y="14" width="20" height="8" rx="2" />
+      <line x1="6" y1="6" x2="6.01" y2="6" />
+      <line x1="6" y1="18" x2="6.01" y2="18" />
+    </svg>
+  </div>
+  <p class="muted">Belum ada perangkat di inventory.</p>
+  <a href="{{ url_for('dashboard') }}" class="button secondary small" style="margin-top:12px;">Tambah Device</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script id="inventoryData" type="application/json">{{ inventory | tojson }}</script>
+<script>
+  var inventoryDataNode = document.getElementById('inventoryData');
+  var INVENTORY = JSON.parse((inventoryDataNode && inventoryDataNode.textContent) || '[]');
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function shortIface(name) {
+    return name
+      .replace(/GigabitEthernet/g, 'Gi')
+      .replace(/FastEthernet/g, 'Fa')
+      .replace(/Serial/g, 'Se')
+      .replace(/Loopback/g, 'Lo')
+      .replace(/Tunnel/g, 'Tu')
+      .replace(/Ethernet/g, 'Et');
+  }
+
+  function ifaceColor(status, protocol) {
+    var s = (status || '').toLowerCase();
+    var p = (protocol || '').toLowerCase();
+    if (s.includes('admin') || s.includes('administratively')) return { dot: '#F87171', bg: 'rgba(248,113,113,.08)', border: 'rgba(248,113,113,.25)' };
+    if (s.includes('up') && p.includes('up')) return { dot: '#4ADE80', bg: 'rgba(74,222,128,.08)', border: 'rgba(74,222,128,.25)' };
+    return { dot: '#FBBF24', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)' };
+  }
+
+  function renderIfaces(interfaces) {
+    if (!interfaces || interfaces.length === 0) {
+      return '<span style="color:var(--muted-light);font-size:12px;">—</span>';
+    }
+    return interfaces.map(function (iface) {
+      var c = ifaceColor(iface.status, iface.protocol);
+      var ip = (iface.ip_address && iface.ip_address !== 'unassigned')
+        ? '<span style="color:var(--muted);margin-left:4px;">' + escapeHtml(iface.ip_address) + '</span>'
+        : '';
+      return '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 3px;padding:3px 7px;'
+        + 'background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:4px;'
+        + 'font-size:11.5px;font-family:var(--font-mono);white-space:nowrap;">'
+        + '<span style="width:6px;height:6px;border-radius:50%;background:' + c.dot + ';flex-shrink:0;"></span>'
+        + escapeHtml(shortIface(iface.interface))
+        + ip
+        + '</span>';
+    }).join('');
+  }
+
+  function setLoading(row) {
+    ['col-uptime', 'col-ios', 'col-hw', 'col-routes', 'col-ifaces'].forEach(function (cls) {
+      var cell = row.querySelector('.' + cls);
+      if (cell) cell.innerHTML = '<span class="shimmer-text">···</span>';
+    });
+  }
+
+  function fetchDevice(deviceId) {
+    var row = document.getElementById('row-' + deviceId);
+    if (!row) return Promise.resolve();
+
+    return fetch('/api/device/' + encodeURIComponent(deviceId) + '/detail')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.ok || (data.detail && data.detail.error)) {
+          var errMsg = (data.detail && data.detail.error) ? data.detail.error : (data.error || 'Gagal');
+          row.querySelector('.col-uptime').innerHTML =
+            '<span style="color:var(--danger);font-size:12px;display:flex;align-items:center;gap:5px;">'
+            + '<span class="status-dot red"></span>Gagal terhubung</span>';
+          row.querySelector('.col-ios').innerHTML = '';
+          row.querySelector('.col-hw').innerHTML = '';
+          row.querySelector('.col-routes').innerHTML = '';
+          row.querySelector('.col-ifaces').innerHTML =
+            '<span style="color:var(--muted);font-size:11px;">' + escapeHtml(errMsg) + '</span>';
+          return;
+        }
+        var d = data.detail;
+        row.querySelector('.col-uptime').textContent = d.uptime || '—';
+        row.querySelector('.col-ios').innerHTML = d.ios_version !== 'unknown'
+          ? '<code>' + escapeHtml(d.ios_version) + '</code>' : '<span style="color:var(--muted-light);">—</span>';
+        row.querySelector('.col-hw').innerHTML = d.hardware !== 'unknown'
+          ? '<code>' + escapeHtml(d.hardware) + '</code>' : '<span style="color:var(--muted-light);">—</span>';
+        row.querySelector('.col-routes').innerHTML =
+          '<span style="font-weight:600;font-size:15px;">' + escapeHtml(String(d.route_count)) + '</span>';
+        row.querySelector('.col-ifaces').innerHTML = renderIfaces(d.interfaces);
+      })
+      .catch(function (err) {
+        row.querySelector('.col-uptime').innerHTML =
+          '<span style="color:var(--danger);font-size:12px;">Error</span>';
+        ['col-ios', 'col-hw', 'col-routes', 'col-ifaces'].forEach(function (cls) {
+          var cell = row.querySelector('.' + cls);
+          if (cell) cell.innerHTML = '';
+        });
+      });
+  }
+
+  function refreshAll() {
+    var btn = document.getElementById('btnRefreshAll');
+    if (btn) btn.disabled = true;
+
+    document.querySelectorAll('#devicesTable tbody tr').forEach(function (row) {
+      setLoading(row);
+    });
+
+    var fetches = INVENTORY.map(function (dev) { return fetchDevice(dev.id); });
+    Promise.allSettled(fetches).then(function () {
+      if (btn) btn.disabled = false;
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    INVENTORY.forEach(function (dev) { fetchDevice(dev.id); });
+  });
+</script>
+{% endblock %}

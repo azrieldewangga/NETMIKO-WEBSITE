@@ -18,9 +18,13 @@ from automation import (
     apply_interface_action,
     check_device_reachable,
     execute_batch,
+    execute_terminal_command,
     find_device,
+    get_activity_log,
+    get_device_detail,
     get_interface_summary,
     load_inventory,
+    log_activity,
     parse_batch_rows,
     update_inventory_device,
 )
@@ -126,13 +130,19 @@ def register_routes(app):
 
         def _check(device):
             if device.get("enabled"):
-                return device, check_device_reachable(
+                status = check_device_reachable(
                     device,
                     username=default_username,
                     password=default_password,
                     secret=default_secret,
                     timeout=3.5,
                 )
+                level = "INFO" if status == "online" else "WARNING"
+                last = get_activity_log(device["id"], limit=1)
+                last_status = last[0].get("detail") if last and last[0].get("action") == "connectivity_check" else None
+                if last_status != status:
+                    log_activity(device["id"], level, "connectivity_check", status)
+                return device, status
             return device, "offline"
 
         with ThreadPoolExecutor(max_workers=len(devices) or 1) as pool:
@@ -283,9 +293,11 @@ def register_routes(app):
                         else:
                             flash(
                                 f"Aksi '{action}' pada {device['id']}/{interface} berhasil.", "success")
+                        log_activity(device_id, "INFO", action, f"{action} {interface} → {value or '-'}", user=session.get("web_username"))
                         connected = True
                     except (automation.ConnectionError, ActionError, ValueError) as exc:
                         error = str(exc)
+                        log_activity(device_id, "ERROR", action or "connect", str(exc), user=session.get("web_username"))
 
         # Ambil daftar interface (read-only) pake kredensial di cache atau yang diisi
         username, password, secret = _get_device_credentials(device_id)
@@ -465,6 +477,10 @@ def register_routes(app):
                     password=password,
                     secret=secret,
                 )
+                for r in results.get("successful", []):
+                    log_activity(r["device"], "INFO", "batch_action", f"{r['action']} {r['interface']} → {r['value']}", user=session.get("web_username"))
+                for r in results.get("failed", []):
+                    log_activity(r["device"], "ERROR", "batch_action", r["error"], user=session.get("web_username"))
                 if results["successful"]:
                     flash(
                         f"{len(results['successful'])} perubahan berhasil dijalankan.", "success")
@@ -527,6 +543,150 @@ def register_routes(app):
             return jsonify({"ok": True, "message": f"Device '{device_data['id']}' berhasil ditambahkan."})
         except InventoryError as exc:
             return jsonify({"ok": False, "message": str(exc)}), 400
+
+    # ── TERMINAL ─────────────────────────────────────────────
+
+    def _get_terminal_session():
+        device_id = session.get("terminal_device_id")
+        if not device_id:
+            return None
+        return {
+            "device_id": device_id,
+            "username": session.get("terminal_username", ""),
+            "password": session.get("terminal_password", ""),
+            "secret": session.get("terminal_secret", "") or None,
+        }
+
+    @app.route("/terminal")
+    @login_required
+    def terminal_page():
+        inventory = load_inventory(_get_inventory_path())["devices"]
+        sess = _get_terminal_session()
+        terminal_device = None
+        if sess:
+            try:
+                terminal_device = find_device(inventory, sess["device_id"])
+            except InventoryError:
+                for key in ("terminal_device_id", "terminal_username", "terminal_password", "terminal_secret"):
+                    session.pop(key, None)
+                sess = None
+        return render_template(
+            "terminal.html",
+            title="CLI Terminal",
+            inventory=inventory,
+            has_terminal_session=bool(sess),
+            terminal_device=terminal_device,
+        )
+
+    @app.route("/terminal/connect", methods=["POST"])
+    @login_required
+    def terminal_connect():
+        inventory = load_inventory(_get_inventory_path())["devices"]
+        device_id = request.form.get("device_id", "").strip()
+        username = (request.form.get("username", "").strip() or current_app.config["LAB_DEVICE_USERNAME"])
+        password = request.form.get("password", "") or current_app.config["LAB_DEVICE_PASSWORD"]
+        secret = request.form.get("secret", "").strip() or None
+
+        try:
+            device = find_device(inventory, device_id)
+        except InventoryError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("terminal_page"))
+
+        try:
+            conn = automation.connect_device(device, username, password, secret)
+            conn.disconnect()
+            session["terminal_device_id"] = device_id
+            session["terminal_username"] = username
+            session["terminal_password"] = password
+            session["terminal_secret"] = secret or ""
+            log_activity(device_id, "INFO", "terminal_connect", f"Connected via web terminal", user=session.get("web_username"))
+            flash(f"Terhubung ke {device['name']}.", "success")
+        except automation.ConnectionError as exc:
+            log_activity(device_id, "ERROR", "terminal_connect", str(exc), user=session.get("web_username"))
+            flash(f"Gagal terhubung: {exc}", "error")
+
+        return redirect(url_for("terminal_page"))
+
+    @app.route("/terminal/execute", methods=["POST"])
+    @login_required
+    def terminal_execute():
+        sess = _get_terminal_session()
+        if not sess:
+            return jsonify({"ok": False, "error": "Belum terhubung ke perangkat."})
+
+        data = request.get_json(silent=True) or {}
+        command = data.get("command", "").strip()
+        if not command:
+            return jsonify({"ok": False, "error": "Command tidak boleh kosong."})
+
+        inventory = load_inventory(_get_inventory_path())["devices"]
+        try:
+            device = find_device(inventory, sess["device_id"])
+        except InventoryError:
+            return jsonify({"ok": False, "error": "Device tidak ditemukan di inventory."})
+
+        try:
+            output = execute_terminal_command(device, sess["username"], sess["password"], command, sess["secret"])
+            log_activity(sess["device_id"], "INFO", "terminal_cmd", command[:120], user=session.get("web_username"))
+            return jsonify({"ok": True, "output": output, "command": command})
+        except (ActionError, automation.ConnectionError) as exc:
+            return jsonify({"ok": False, "error": str(exc)})
+
+    @app.route("/terminal/disconnect", methods=["POST"])
+    @login_required
+    def terminal_disconnect():
+        for key in ("terminal_device_id", "terminal_username", "terminal_password", "terminal_secret"):
+            session.pop(key, None)
+        flash("Berhasil disconnect dari terminal.", "success")
+        return redirect(url_for("terminal_page"))
+
+    # ── DEVICE INFO ───────────────────────────────────────────
+
+    @app.route("/device/<device_id>/info")
+    @login_required
+    def device_info(device_id: str):
+        inventory = load_inventory(_get_inventory_path())["devices"]
+        try:
+            device = find_device(inventory, device_id)
+        except InventoryError as exc:
+            abort(404, description=str(exc))
+
+        username, password, secret = _get_device_credentials(device_id)
+        detail = get_device_detail(device, username, password, secret or None)
+        activity = get_activity_log(device_id, limit=100)
+
+        return render_template(
+            "device_info.html",
+            title=f"Detail — {device['name']}",
+            device=device,
+            detail=detail,
+            activity=activity,
+        )
+
+    @app.route("/api/device/<device_id>/log")
+    @login_required
+    def api_device_log(device_id: str):
+        entries = get_activity_log(device_id, limit=100)
+        return jsonify({"ok": True, "entries": entries})
+
+    @app.route("/api/device/<device_id>/detail")
+    @login_required
+    def api_device_detail(device_id: str):
+        inventory = load_inventory(_get_inventory_path())["devices"]
+        try:
+            device = find_device(inventory, device_id)
+        except InventoryError as exc:
+            return jsonify({"ok": False, "error": str(exc)})
+        username, password, secret = _get_device_credentials(device_id)
+        detail = get_device_detail(device, username, password, secret or None)
+        return jsonify({"ok": True, "detail": detail})
+
+    @app.route("/devices")
+    @login_required
+    def devices_page():
+        inventory = load_inventory(_get_inventory_path())["devices"]
+        return render_template("devices.html", title="Devices", inventory=inventory)
 
     # ── PROFILE ───────────────────────────────────────────────
 

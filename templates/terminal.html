@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block sidebar_extras %}
+<div class="nav-label" style="margin-top:12px;">Terminal</div>
+<a href="{{ url_for('dashboard') }}" class="nav-item">
+  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+  </svg>
+  Kembali
+</a>
+{% if has_terminal_session and terminal_device %}
+<a href="{{ url_for('device_info', device_id=terminal_device.id) }}" class="nav-item">
+  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+  Full Detail
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">CLI Terminal</h1>
+    <p class="page-subtitle">Akses langsung ke perangkat Cisco via SSH</p>
+  </div>
+  {% if has_terminal_session and terminal_device %}
+  <span class="status-pill online"><span class="status-dot green"></span>{{ terminal_device.name }}</span>
+  {% endif %}
+</div>
+
+<div class="grid-5-7">
+
+  {# Kolom kiri: Connection Card #}
+  <div>
+    <div class="card">
+      <div class="card-header" style="margin-bottom:14px;">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:5px;">
+            <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
+          </svg>
+          Koneksi SSH
+        </div>
+      </div>
+
+      {% if has_terminal_session and terminal_device %}
+      <div style="background:var(--success-bg);border:1px solid var(--success-border);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+        <span class="status-dot green"></span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--success);">{{ terminal_device.name }}</div>
+          <div style="font-size:11px;color:var(--success);opacity:.8;font-family:var(--font-mono);">{{ terminal_device.host }}:{{ terminal_device.port }}</div>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('terminal_disconnect') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="secondary" style="width:100%;justify-content:center;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Disconnect
+        </button>
+      </form>
+
+      {% else %}
+      <form method="post" action="{{ url_for('terminal_connect') }}" id="connectForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label for="device_id">Perangkat</label>
+          <select name="device_id" id="device_id" required>
+            <option value="">-- pilih perangkat --</option>
+            {% for dev in inventory %}
+            <option value="{{ dev.id }}">{{ dev.name }} · {{ dev.host }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="t_username">SSH Username</label>
+          <input id="t_username" name="username" autocomplete="off" placeholder="admin">
+        </div>
+        <div class="form-group">
+          <label for="t_password">SSH Password <span class="required">*</span></label>
+          <input id="t_password" name="password" type="password" autocomplete="new-password" required>
+        </div>
+        <div class="form-group">
+          <label for="t_secret">Enable Secret</label>
+          <input id="t_secret" name="secret" type="password" placeholder="Opsional">
+        </div>
+        <div class="actions actions-end" style="margin-top:18px;">
+          <button type="submit" id="connectBtn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
+            </svg>
+            Connect
+          </button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+
+    <div class="card" style="margin-top:14px;background:var(--warning-bg);border-color:var(--warning-border);">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--warning);margin-bottom:2px;">Perhatian</div>
+          <div style="font-size:12px;color:var(--warning);line-height:1.5;">Perintah dieksekusi langsung di perangkat. Hindari perintah yang dapat memutus koneksi.</div>
+        </div>
+      </div>
+    </div>
+
+    {% if has_terminal_session %}
+    <div class="card" style="margin-top:14px;">
+      <div class="card-title" style="margin-bottom:10px;">Riwayat</div>
+      <div id="historyList" style="font-size:12px;color:var(--muted);font-family:var(--font-mono);display:flex;flex-direction:column;gap:4px;">
+        <span style="color:var(--muted-light);">— belum ada perintah —</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# Kolom kanan: Terminal Area #}
+  <div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="card-header" style="padding:12px 16px;border-bottom:1px solid var(--border);margin:0;background:var(--surface);">
+        <div class="card-title" style="display:flex;align-items:center;gap:7px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          Terminal Output
+        </div>
+        <button type="button" class="secondary small" onclick="clearTerminal()">Clear</button>
+      </div>
+
+      <div id="terminalOutput" class="terminal-output">
+        <div class="term-line term-output">NetPanel CLI Terminal — siap digunakan.</div>
+        {% if not has_terminal_session %}
+        <div class="term-line term-output" style="color:#4B5563;">Hubungkan ke perangkat di panel kiri untuk mulai mengetik perintah.</div>
+        {% else %}
+        <div class="term-line term-output">Terhubung ke <span style="color:#86EFAC;">{{ terminal_device.name }}</span>. Ketik perintah Cisco IOS di bawah.</div>
+        {% endif %}
+      </div>
+
+      <div class="term-input-bar">
+        <span class="term-prompt">$</span>
+        <input type="text" id="termInput" class="term-input"
+          placeholder="{{ 'Ketik perintah Cisco IOS...' if has_terminal_session else 'Hubungkan dulu ke perangkat...' }}"
+          {% if not has_terminal_session %}disabled{% endif %}
+          autocomplete="off" spellcheck="false">
+        <button type="button" id="sendBtn" onclick="sendCommand()"
+          {% if not has_terminal_session %}disabled{% endif %}
+          style="flex-shrink:0;padding:6px 14px;font-size:13px;">
+          Send
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var cmdHistory = [], historyIdx = -1;
+  var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function appendToTerminal(text, type) {
+    var out = document.getElementById('terminalOutput');
+    var div = document.createElement('div');
+    div.className = 'term-line term-' + type;
+    div.textContent = text;
+    out.appendChild(div);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  function clearTerminal() {
+    document.getElementById('terminalOutput').innerHTML = '';
+  }
+
+  function updateHistoryPanel() {
+    var panel = document.getElementById('historyList');
+    if (!panel) return;
+    if (cmdHistory.length === 0) {
+      panel.innerHTML = '<span style="color:var(--muted-light);">— belum ada perintah —</span>';
+      return;
+    }
+    panel.innerHTML = cmdHistory.slice(-8).reverse().map(function(cmd) {
+      return '<span style="cursor:pointer;color:var(--muted);transition:color .1s;" onclick="fillCommand(' + JSON.stringify(escapeHtml(cmd)) + ')" onmouseenter="this.style.color=\'var(--text)\'" onmouseleave="this.style.color=\'var(--muted)\'">' + escapeHtml(cmd) + '</span>';
+    }).join('');
+  }
+
+  function fillCommand(cmd) {
+    var input = document.getElementById('termInput');
+    if (input && !input.disabled) {
+      input.value = cmd;
+      input.focus();
+    }
+  }
+
+  function sendCommand() {
+    var input = document.getElementById('termInput');
+    var cmd = input.value.trim();
+    if (!cmd) return;
+
+    appendToTerminal('$ ' + cmd, 'cmd');
+    cmdHistory.push(cmd);
+    historyIdx = cmdHistory.length;
+    updateHistoryPanel();
+    input.value = '';
+
+    var sendBtn = document.getElementById('sendBtn');
+    input.disabled = true;
+    sendBtn.disabled = true;
+
+    fetch('{{ url_for("terminal_execute") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify({ command: cmd })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        appendToTerminal(data.output || '(no output)', 'output');
+      } else {
+        appendToTerminal('Error: ' + data.error, 'error');
+      }
+    })
+    .catch(function(err) {
+      appendToTerminal('Network error: ' + err, 'error');
+    })
+    .finally(function() {
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var input = document.getElementById('termInput');
+    if (input) {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          sendCommand();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (historyIdx > 0) { historyIdx--; input.value = cmdHistory[historyIdx]; }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (historyIdx < cmdHistory.length - 1) {
+            historyIdx++;
+            input.value = cmdHistory[historyIdx];
+          } else {
+            historyIdx = cmdHistory.length;
+            input.value = '';
+          }
+        }
+      });
+      input.focus();
+    }
+
+    var connectForm = document.getElementById('connectForm');
+    if (connectForm) {
+      connectForm.addEventListener('submit', function() {
+        var btn = document.getElementById('connectBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Menghubungkan...'; }
+      });
+    }
+  });
+</script>
+{% endblock %}
