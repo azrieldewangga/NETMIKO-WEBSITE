@@ -1,0 +1,397 @@
+# Supported Platforms
+
+###### Regularly tested
+
+- Arista vEOS
+- Cisco IOS
+- Cisco IOS-XE
+- Cisco IOS-XR
+- Cisco NX-OS
+- Cisco SG300
+- Juniper Junos
+- Linux
+
+###### Limited testing
+
+- 6Wind
+- Adtran OS
+- Adva AOS FSP150 F2 & F3
+- Alcatel AOS6/AOS8
+- Apresia Systems AEOS
+- ARRIS CER
+- Aruba OS Switch
+- AudioCodes Gateways & Controllers
+- Aviat WTM Outdoor Radio
+- Broadcom ICOS
+- Calix B6
+- Casa Systems CMTS
+- Centec Networks
+- Check Point GAiA
+- Cisco AireOS (Wireless LAN Controllers)
+- Cisco ASA
+- Cisco S200/S300/S500
+- CloudGenix ION
+- Dell OS9 (Force10)
+- Dell OS10
+- Dell PowerConnect
+- Ekinops 360
+- Ericsson IPOS
+- Ericsson MINI-LINK 66XX & 63XX
+- Extreme ERS (Avaya)
+- Extreme MLX/NetIron (Brocade/Foundry)
+- Extreme TierraOS
+- Extreme VDX (Brocade)
+- Extreme VSP (Avaya)
+- Fiberstore FSOS
+- Furukawa FITELnet
+- Hillstone StoneOS
+- HPE Comware7
+- HPE ProCurve
+- Huawei
+- Huawei OLT
+- Huawei SmartAX
+- Infinera Packet
+- IP Infusion OcNOS
+- Juniper ScreenOS
+- Maipu
+- MikroTik RouterOS
+- MikroTik SwitchOS
+- NEC Univerge IX Routers
+- NetApp cDOT
+- Netgear ProSafe
+- Nokia/Alcatel SR OS
+- Nokia SR Linux
+- NVIDIA-Mellanox
+- OneAccess
+- Palo Alto PAN-OS
+- Pluribus
+- Ruckus ICX/FastIron
+- Ruijie Networks
+- Supermicro SMIS
+- Teldat CIT
+- TPLink JetStream
+- Ubiquiti EdgeSwitch
+- Vyatta VyOS
+- Yamaha
+- ZTE ZXROS
+
+###### Experimental
+
+- A10
+- Accedian
+- Alaxala AX2600S and AX3600S
+- Allied Telesis AlliedWare Plus
+- Arris CER
+- Aruba OS (Wireless Controllers/WAPs)
+- Aruba AOS-CX
+- AsterFusion AsterNOS SONiC
+- Avara OAP800
+- Bintec BOSS (Bintec/Funkwerk)
+- Brocade Fabric OS
+- C-DOT CROS
+- Ciena SAOS
+- Ciena SAOS10
+- Ciena Waveserver
+- Citrix Netscaler
+- Cisco APIC (Linux)
+- Cisco Telepresence
+- Cisco Viptela
+- Corelight Linux
+- Coriant
+- Cumulus VX Linux
+- Dell OS6
+- Dell EMC Isilon
+- Digi TransPort Routers
+- Edgecore SONiC
+- Eltex
+- Enterasys
+- Endace
+- Extreme EXOS
+- Extreme Wing
+- Extreme SLX (Brocade)
+- F5 TMSH
+- F5 Linux
+- Fiberstore NetworkOS
+- Fiberstore FS-OS (V2)
+- Fortinet
+- Fujitsu Si-R (Fsas Technologies)
+- Garderos GRS
+- Genexis Saturn SOLT33 (telnet only)
+- Hioso OLT
+- Hirschmann HiOS
+- Huawei ONT
+- IIJ SEIL
+- Lancom LCOS SX4
+- Lancom LCOS SX5
+- Moxa EDS
+- MRV Communications OptiSwitch
+- MRV LX
+- Nokia/Alcatel SR-OS
+- Nokia SR Linux
+- Perle IOLAN Console Server
+- Optilink EOLT 9702 (telnet only)
+- QuantaMesh
+- Rad ETX
+- Raisecom ROAP
+- Raisecom ROS
+- Silver Peak VXOA
+- Sophos SFOS
+- Telco Systems BiNOS
+- Ubiquiti Unifi Switch
+- Versa Networks FlexVNF
+- Vertiv MPH Power Distribution Units
+- Watchguard Firebox
+- ZPE Systems Nodegrid
+- Zyxel NOS
+- 6WIND TurboRouter
+
+###### Supported SSH device_type values
+
+- a10
+- accedian
+- adtran_os
+- adva_fsp150f2
+- adva_fsp150f3
+- alaxala_ax26s
+- alaxala_ax36s
+- alcatel_aos
+- alcatel_sros
+- allied_telesis_awplus
+- apresia_aeos
+- arista_eos
+- arris_cer
+- aruba_aoscx
+- aruba_os
+- aruba_osswitch
+- aruba_procurve
+- asterfusion_asternos
+- audiocode_66
+- audiocode_72
+- audiocode_shell
+- avara_aos
+- avaya_ers
+- avaya_vsp
+- aviat_wtm
+- bintec_boss
+- broadcom_icos
+- brocade_fastiron
+- brocade_fos
+- brocade_netiron
+- brocade_nos
+- brocade_vdx
+- brocade_vyos
+- calix_b6
+- casa_cmts
+- cdot_cros
+- centec_os
+- checkpoint_gaia
+- ciena_saos
+- ciena_saos10
+- ciena_waveserver
+- cisco_apic
+- cisco_asa
+- cisco_ftd
+- cisco_ios
+- cisco_nxos
+- cisco_s200
+- cisco_s300
+- cisco_s500
+- cisco_tp
+- cisco_viptela
+- cisco_wlc
+- cisco_xe
+- cisco_xr
+- cloudgenix_ion
+- corelight_linux
+- coriant
+- cumulus_linux
+- dell_dnos9
+- dell_force10
+- dell_isilon
+- dell_os10
+- dell_os6
+- dell_os9
+- dell_powerconnect
+- dell_sonic
+- digi_transport
+- dlink_ds
+- edgecore_sonic
+- ekinops_ek360
+- eltex
+- eltex_esr
+- endace
+- enterasys
+- ericsson_ipos
+- ericsson_mltn63
+- ericsson_mltn66
+- extreme
+- extreme_ers
+- extreme_exos
+- extreme_netiron
+- extreme_nos
+- extreme_slx
+- extreme_tierra
+- extreme_vdx
+- extreme_vsp
+- extreme_wing
+- f5_linux
+- f5_ltm
+- f5_tmsh
+- fiberstore_fsos
+- fiberstore_fsosv2
+- fiberstore_networkos
+- flexvnf
+- fortinet
+- fujitsu_sir
+- furukawa_fitelnet
+- garderos_grs
+- generic
+- generic_termserver
+- h3c_comware
+- hillstone_stoneos
+- hirschmann_hios
+- hp_comware
+- hp_procurve
+- huawei
+- huawei_olt
+- huawei_ont
+- huawei_smartax
+- huawei_smartaxmmi
+- huawei_vrp
+- huawei_vrpv8
+- infinera_packet
+- ipinfusion_ocnos
+- juniper
+- juniper_junos
+- juniper_screenos
+- keymile
+- keymile_nos
+- lancom_lcossx4
+- lancom_lcossx5
+- linux
+- maipu
+- mellanox
+- mellanox_mlnxos
+- mikrotik_routeros
+- mikrotik_switchos
+- moxa_nos
+- mrv_lx
+- mrv_optiswitch
+- nec_ix
+- netapp_cdot
+- netgear_prosafe
+- netscaler
+- nokia_srl
+- nokia_sros
+- oneaccess_oneos
+- ovs_linux
+- paloalto_panos
+- pluribus
+- quanta_mesh
+- rad_etx
+- raisecom_roap
+- raisecom_ros
+- ruckus_fastiron
+- ruijie_os
+- iij_seilos
+- silverpeak_vxoa
+- sixwind_os
+- sophos_sfos
+- supermicro_smis
+- telcosystems_binos
+- teldat_cit
+- tplink_jetstream
+- ubiquiti_edge
+- ubiquiti_edgerouter
+- ubiquiti_edgeswitch
+- ubiquiti_unifiswitch
+- vertiv_mph
+- vyatta_vyos
+- vyos
+- watchguard_fireware
+- yamaha
+- zpe_nodegrid
+- zte_zxros
+- zyxel_os
+
+###### Supported Telnet device_type values
+
+- adtran_os_telnet
+- apresia_aeos_telnet
+- arista_eos_telnet
+- aruba_procurve_telnet
+- audiocode_66_telnet
+- audiocode_72_telnet
+- audiocode_shell_telnet
+- bintec_boss_telnet
+- brocade_fastiron_telnet
+- brocade_netiron_telnet
+- calix_b6_telnet
+- centec_os_telnet
+- ciena_saos_telnet
+- cisco_ios_telnet
+- cisco_nxos_telnet
+- cisco_s200_telnet
+- cisco_s300_telnet
+- cisco_s500_telnet
+- cisco_xr_telnet
+- dell_dnos6_telnet
+- dell_powerconnect_telnet
+- dlink_ds_telnet
+- extreme_exos_telnet
+- extreme_netiron_telnet
+- extreme_telnet
+- fiberstore_fsosv2_telnet
+- furukawa_fitelnet_telnet
+- generic_telnet
+- generic_termserver_telnet
+- genexis_solt33_telnet
+- hp_comware_telnet
+- hp_procurve_telnet
+- hioso_olt_telnet
+- huawei_olt_telnet
+- huawei_ont_telnet
+- huawei_telnet
+- infinera_packet_telnet
+- ipinfusion_ocnos_telnet
+- juniper_junos_telnet
+- maipu_telnet
+- nec_ix_telnet
+- nokia_sros_telnet
+- oneaccess_oneos_telnet
+- optilink_eolt11444_telnet
+- optilink_eolt9702_telnet
+- paloalto_panos_telnet
+- rad_etx_telnet
+- raisecom_ros_telnet
+- raisecom_telnet
+- ruckus_fastiron_telnet
+- ruijie_os_telnet
+- iij_seilos_telnet
+- supermicro_smis_telnet
+- telcosystems_binos_telnet
+- teldat_cit_telnet
+- tplink_jetstream_telnet
+- yamaha_telnet
+- zte_zxros_telnet
+
+###### Supported Secure Copy device_type values
+
+- aruba_os
+- arista_eos
+- ciena_saos
+- cisco_asa
+- cisco_ios
+- cisco_nxos
+- cisco_xe
+- cisco_xr
+- dell_os10
+- dell_sonic
+- extreme_exos
+- juniper_junos
+- linux
+- nokia_sros
+- mikrotik_routeros
+- ubiquiti_edgerouter
+- zpe_nodegrid
+

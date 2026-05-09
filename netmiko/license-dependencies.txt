@@ -1,0 +1,16 @@
+#### Netmiko itself
+ 
+Name           License
+-------------  -------
+netmiko        MIT License
+telnetlib      PSF2
+
+##### Direct dependencies
+Name           License
+-------------  -------
+paramiko       GNU Library or Lesser General Public License (LGPL)
+scp            GNU Library or Lesser General Public License (LGPL)
+PyYAML         MIT License
+textfsm        Apache2
+ntc-templates  Apache2
+pyserial       BSD License

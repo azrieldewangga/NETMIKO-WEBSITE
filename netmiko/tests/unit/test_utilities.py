@@ -1,0 +1,598 @@
+#!/usr/bin/env python
+
+import importlib.util
+import os
+import sys
+from os.path import dirname, join, relpath
+from pathlib import Path
+from unittest.mock import MagicMock
+import pytest
+
+from netmiko import utilities
+from textfsm import clitable
+
+from netmiko.exceptions import NetmikoParsingException
+
+RESOURCE_FOLDER = join(dirname(dirname(__file__)), "etc")
+RELATIVE_RESOURCE_FOLDER = join(dirname(dirname(relpath(__file__))), "etc")
+CONFIG_FILENAME = join(RESOURCE_FOLDER, ".netmiko.yml")
+TTP_FILE = join(RESOURCE_FOLDER, "show_run_interfaces.ttp")
+
+is_linux = sys.platform == "linux" or sys.platform == "linux2"
+skip_if_not_linux = pytest.mark.skipif(not is_linux, reason="Test Requires Linux")
+
+SHOW_RUN_INT = """Building configuration...
+
+Current configuration : 98 bytes
+!
+interface GigabitEthernet0/0/1
+ description *** TTP Testing ***
+ no ip address
+ shutdown
+ media-type rj45
+ negotiation auto
+end"""
+
+# SHOW_VER_HEADER is just for linters and line length
+SHOW_VER_HEADER = (
+    "Cisco IOS Software, C3560CX Software (C3560CX-UNIVERSALK9-M), "
+    "Version 15.2(4)E7, RELEASE SOFTWARE (fc2)"
+)
+SHOW_VERSION = (
+    SHOW_VER_HEADER
+    + """
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2018 by Cisco Systems, Inc.
+Compiled Tue 18-Sep-18 13:20 by prod_rel_team
+
+ROM: Bootstrap program is C3560CX boot loader
+BOOTLDR: C3560CX Boot Loader (C3560CX-HBOOT-M) Version 15.2(4r)E5, RELEASE SOFTWARE (fc4)
+
+3560CX uptime is 5 weeks, 1 day, 2 hours, 30 minutes
+System returned to ROM by power-on
+System restarted at 11:45:26 PDT Tue May 7 2019
+System image file is "flash:c3560cx-universalk9-mz.152-4.E7.bin"
+Last reload reason: power-on
+
+
+
+This product contains cryptographic features and is subject to United
+States and local country laws governing import, export, transfer and
+use. Delivery of Cisco cryptographic products does not imply
+third-party authority to import, export, distribute or use encryption.
+Importers, exporters, distributors and users are responsible for
+compliance with U.S. and local country laws. By using this product you
+agree to comply with applicable laws and regulations. If you are unable
+to comply with U.S. and local laws, return this product immediately.
+
+A summary of U.S. laws governing Cisco cryptographic products may be found at:
+http://www.cisco.com/wwl/export/crypto/tool/stqrg.html
+
+If you require further assistance please contact us by sending email to
+export@cisco.com.
+
+License Level: ipservices
+License Type: Permanent Right-To-Use
+Next reload license Level: ipservices
+
+cisco WS-C3560CX-8PC-S (APM86XXX) processor (revision A0) with 524288K bytes of memory.
+Processor board ID FOCXXXXXXXX
+Last reset from power-on
+5 Virtual Ethernet interfaces
+12 Gigabit Ethernet interfaces
+The password-recovery mechanism is enabled.
+
+512K bytes of flash-simulated non-volatile configuration memory.
+Base ethernet MAC Address       : 12:34:56:78:9A:BC
+Motherboard assembly number     : 86-75309-01
+Power supply part number        : 867-5309-01
+Motherboard serial number       : FOCXXXXXXXX
+Power supply serial number      : FOCXXXXXXXX
+Model revision number           : A0
+Motherboard revision number     : A0
+Model number                    : WS-C3560CX-8PC-S
+System serial number            : FOCXXXXXXXX
+Top Assembly Part Number        : 86-7530-91
+Top Assembly Revision Number    : A0
+Version ID                      : V01
+CLEI Code Number                : CMM1400DRA
+Hardware Board Revision Number  : 0x02
+
+
+Switch Ports Model                     SW Version            SW Image
+------ ----- -----                     ----------            ----------
+*    1 12    WS-C3560CX-8PC-S          15.2(4)E7             C3560CX-UNIVERSALK9-M
+
+
+Configuration register is 0xF
+"""
+)
+
+
+def test_load_yaml_file():
+    """Read a YAML file successfully"""
+    filename = join(RESOURCE_FOLDER, "yaml_test.yml")
+    expected = {
+        "answer": 42,
+        "hello": "world",
+        "complex": {"truth": False, "key": "value"},
+    }
+    assert utilities.load_yaml_file(filename) == expected
+
+
+def test_invalid_yaml_file():
+    """Try to read an invalid YAML file"""
+    filename = join(RESOURCE_FOLDER, "this_should_not_exist.yml")
+    try:
+        utilities.load_yaml_file(filename)
+    except SystemExit as exc:
+        assert isinstance(exc, SystemExit)
+        return
+    assert False
+
+
+def test_find_cfg_file():
+    """
+    Search for netmiko_tools config file in the following order:
+
+    NETMIKO_TOOLS_CFG environment variable
+    Current directory
+    Home directory
+
+    Look for file named: .netmiko.yml or netmiko.yml
+    """
+    # Search using environment variable (point directly at end file)
+    os.environ["NETMIKO_TOOLS_CFG"] = join(RESOURCE_FOLDER, ".netmiko.yml")
+    assert utilities.find_cfg_file() == CONFIG_FILENAME
+
+    # Search using environment variable (pointing at directory)
+    os.environ["NETMIKO_TOOLS_CFG"] = RESOURCE_FOLDER
+    assert utilities.find_cfg_file() == CONFIG_FILENAME
+
+    try:
+        cwd = os.getcwd()
+        os.chdir(dirname(__file__))
+
+        # Environment var should be preferred over current dir
+        assert utilities.find_cfg_file() == CONFIG_FILENAME
+
+        #  Delete env var and verify current dir is returned
+        del os.environ["NETMIKO_TOOLS_CFG"]
+        assert utilities.find_cfg_file() == "./.netmiko.yml"
+    finally:
+        # Change directory back to previous state
+        os.chdir(cwd)
+
+    # Verify explicit call using full filename
+    assert utilities.find_cfg_file(CONFIG_FILENAME) == CONFIG_FILENAME
+
+
+def test_load_cfg_file():
+    """Try to load a configuration file"""
+    expected = {
+        "rtr1": {
+            "device_type": "cisco_ios",
+            "ip": "10.10.10.1",
+            "username": "admin",
+            "password": "cisco123",
+            "secret": "cisco123",
+        },
+        "rtr2": {
+            "device_type": "cisco_ios",
+            "ip": "10.10.10.2",
+            "username": "admin",
+            "password": "cisco123",
+            "secret": "cisco123",
+        },
+        "cisco": ["rtr1", "rtr2"],
+    }
+    assert utilities.load_devices(CONFIG_FILENAME) == expected
+
+
+def test_obtain_all_devices():
+    """Dynamically create 'all' group."""
+    netmiko_tools_load = utilities.load_devices(CONFIG_FILENAME)
+    expected = {
+        "rtr1": {
+            "device_type": "cisco_ios",
+            "ip": "10.10.10.1",
+            "username": "admin",
+            "password": "cisco123",
+            "secret": "cisco123",
+        },
+        "rtr2": {
+            "device_type": "cisco_ios",
+            "ip": "10.10.10.2",
+            "username": "admin",
+            "password": "cisco123",
+            "secret": "cisco123",
+        },
+    }
+    result = utilities.obtain_all_devices(netmiko_tools_load)
+    assert result == expected
+
+
+def test_find_netmiko_dir():
+    """Try to get the netmiko_dir"""
+    folder = dirname(__file__)
+    os.environ["NETMIKO_DIR"] = folder
+    result = utilities.find_netmiko_dir()
+    assert result[0] == folder
+    assert result[1].endswith("/tmp")
+
+
+def test_invalid_netmiko_dir():
+    """Try with an invalid netmiko_base_dir"""
+    os.environ["NETMIKO_DIR"] = "/"
+    try:
+        utilities.find_netmiko_dir()
+    except ValueError as exc:
+        assert isinstance(exc, ValueError)
+        return
+    assert False
+
+
+def test_string_to_bytes():
+    """Convert string to bytes"""
+    assert utilities.write_bytes("test") == b"test"
+
+
+def test_bytes_to_bytes():
+    """Convert bytes to bytes"""
+    result = b"hello world"
+    assert utilities.write_bytes(result) == result
+
+
+def test_invalid_data_to_bytes():
+    """Convert an invalid data type to bytes"""
+    try:
+        utilities.write_bytes(456_779)
+    except ValueError as exc:
+        assert isinstance(exc, ValueError)
+        return
+
+    assert False
+
+
+def test_ensure_resource_dir_exists():
+    """Ensure that the resource folder exists"""
+    utilities.ensure_dir_exists(RESOURCE_FOLDER)
+
+
+def test_ensure_file_exists():
+    """Ensure that a file makes ensure_dir_exists raise an error"""
+    try:
+        utilities.ensure_dir_exists(__file__)
+    except ValueError as exc:
+        assert isinstance(exc, ValueError)
+        return
+    assert False
+
+
+def test_clitable_to_dict():
+    """Converts TextFSM cli_table object to list of dictionaries"""
+    table = clitable.CliTable(template_dir=RESOURCE_FOLDER)
+    text_filename = join(RESOURCE_FOLDER, "textfsm.txt")
+    template_filename = join(RESOURCE_FOLDER, "cisco_ios_show_version.template")
+    with open(text_filename) as data_file:
+        text = data_file.read()
+
+    with open(template_filename) as template_file:
+        table = table._ParseCmdItem(text, template_file)
+
+    result = utilities.clitable_to_dict(table)
+    assert result == [{"model": "4500"}]
+
+
+def test_textfsm_w_index():
+    """Convert raw CLI output to structured data using TextFSM template"""
+    os.environ["NET_TEXTFSM"] = RESOURCE_FOLDER
+    raw_output = "Cisco IOS Software, Catalyst 4500 L3 Switch Software"
+    result = utilities.get_structured_data(raw_output, platform="cisco_ios", command="show version")
+    assert result == [{"model": "4500"}]
+    result = utilities.get_structured_data_textfsm(
+        raw_output, platform="cisco_ios", command="show version"
+    )
+    assert result == [{"model": "4500"}]
+
+
+@skip_if_not_linux
+def test_ntc_templates_discovery():
+    """
+    Verify Netmiko uses proper ntc-templates:
+
+    Order of preference is:
+    1. Find directory in `NET_TEXTFSM` Environment Variable.
+    2. Check for pip installed `ntc-templates` location in this environment.
+    3. ~/ntc-templates/templates.
+
+    If `index` file is not found in any of these locations, raise ValueError
+    """
+
+    # Check environment variable first
+    os.environ["NET_TEXTFSM"] = RELATIVE_RESOURCE_FOLDER
+    ntc_path = utilities.get_template_dir()
+    assert ntc_path == RESOURCE_FOLDER
+
+    # Next should be PIP installed ntc-tempaltes
+    del os.environ["NET_TEXTFSM"]
+    ntc_path = utilities.get_template_dir()
+    ntc_module = importlib.util.find_spec("ntc_templates")
+    expected = str(Path(ntc_module.origin).parent / "templates")
+    assert ntc_path == expected
+
+    # Next should use local index file in ~
+    environment = os.getenv("environment", "local")
+    home_ntc = Path.home() / "ntc-templates" / "ntc_templates" / "templates"
+    if environment == "gh_actions":
+        with pytest.raises(ValueError):
+            utilities.get_template_dir(_skip_ntc_package=True)
+    elif not home_ntc.is_dir():
+        pytest.skip(
+            "~/ntc-templates not found on this machine; please install ntc-templates into your home dir!"
+        )
+    else:
+        ntc_path = utilities.get_template_dir(_skip_ntc_package=True)
+        assert ntc_path == str(home_ntc)
+
+
+def test_textfsm_index_relative_path():
+    """Test relative path for textfsm ntc directory"""
+    os.environ["NET_TEXTFSM"] = RELATIVE_RESOURCE_FOLDER
+    raw_output = "Cisco IOS Software, Catalyst 4500 L3 Switch Software"
+    result = utilities.get_structured_data_textfsm(
+        raw_output, platform="cisco_ios", command="show version"
+    )
+    assert result == [{"model": "4500"}]
+
+
+def test_textfsm_direct_template():
+    """Convert raw CLI output to structured data using TextFSM template (no index)."""
+    raw_output = "Cisco IOS Software, Catalyst 4500 L3 Switch Software"
+    result = utilities.get_structured_data_textfsm(
+        raw_output,
+        platform="cisco_ios",
+        command="show version",
+        template=f"{RESOURCE_FOLDER}/cisco_ios_show_version.template",
+    )
+    assert result == [{"model": "4500"}]
+
+    # Should also work with no-platform or command
+    result = utilities.get_structured_data_textfsm(
+        raw_output, template=f"{RESOURCE_FOLDER}/cisco_ios_show_version.template"
+    )
+    assert result == [{"model": "4500"}]
+
+
+def test_textfsm_failed_parsing():
+    """Verify raw_output is returned if TextFSM template parsing fails."""
+    raw_output = "This is not 'show version' output"
+    result = utilities.get_structured_data_textfsm(
+        raw_output,
+        platform="cisco_ios",
+        command="show version",
+        template=f"{RESOURCE_FOLDER}/nothinghere",
+    )
+    assert result == raw_output
+
+
+def test_textfsm_missing_template():
+    """Verify raw_output is returned if TextFSM template is missing."""
+    raw_output = "Cisco IOS Software, Catalyst 4500 L3 Switch Software"
+    result = utilities.get_structured_data_textfsm(
+        raw_output,
+        platform="cisco_ios",
+        command="show version",
+        template=f"{RESOURCE_FOLDER}/nothinghere",
+    )
+    assert result == raw_output
+
+
+@pytest.mark.parametrize(
+    "raw_output,platform,command,exception",
+    [
+        # Invalid output with valid template/platform
+        ("Unparsable output", "cisco_ios", "show version", NetmikoParsingException),
+        # Valid output with invalid template/platform (template not found)
+        (
+            "Cisco IOS Software, Catalyst 4500 L3 Switch Software",
+            "cisco_ios",
+            "show invalid-command",
+            NetmikoParsingException,
+        ),
+        # Missing platform
+        ("", "", "show version", NetmikoParsingException),
+    ],
+)
+def test_parsing_errors_textfsm(raw_output, platform, command, exception):
+    """Verify that an error is raised if TextFSM parsing fails and `raise_parsing_error` is set."""
+    with pytest.raises(exception):
+        utilities.get_structured_data_textfsm(
+            raw_output,
+            platform,
+            command,
+            raise_parsing_error=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "raw_output,template",
+    [
+        (
+            SHOW_RUN_INT,
+            TTP_FILE,
+        ),
+    ],
+)
+def test_get_structured_data_ttp(raw_output, template):
+    """Verify TTP Parsing works."""
+    data_struct = utilities.get_structured_data_ttp(
+        raw_output,
+        template=template,
+        raise_parsing_error=True,
+    )
+    assert isinstance(data_struct, list)
+    assert isinstance(data_struct[0][0], dict)
+    assert "*** TTP Testing ***" in data_struct[0][0]["description"]
+
+
+@pytest.mark.parametrize(
+    "raw_output,template,exception",
+    [
+        (
+            SHOW_RUN_INT,
+            "invalid_path.ttp",
+            NetmikoParsingException,
+        ),
+    ],
+)
+def test_parsing_errors_ttp(raw_output, template, exception):
+    with pytest.raises(exception):
+        utilities.get_structured_data_ttp(
+            raw_output,
+            template=template,
+            raise_parsing_error=True,
+        )
+
+
+def test_get_structured_data_genie():
+    """Convert raw CLI output to structured data using Genie"""
+
+    raw_output = SHOW_VERSION
+    result = utilities.get_structured_data_genie(
+        raw_output, platform="cisco_xe", command="show version"
+    )
+    assert result["version"]["chassis"] == "WS-C3560CX-8PC-S"
+
+    netstat_output = """
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+0.0.0.0         172.16.0.1      0.0.0.0         UG        0 0          0 eth0
+169.254.169.254 0.0.0.0         255.255.255.255 UH        0 0          0 eth0
+172.16.0.0      0.0.0.0         255.255.255.0   U         0 0          0 eth0
+"""
+    netstat_output = netstat_output.strip()
+    routes = utilities.get_structured_data_genie(
+        netstat_output, platform="linux", command="netstat -rn"
+    )
+    nexthop_gw = routes["routes"]["0.0.0.0"]["mask"]["0.0.0.0"]["nexthop"][1]["gateway"]
+    assert nexthop_gw == "172.16.0.1"
+
+
+@pytest.mark.parametrize(
+    "raw_output,platform,command,exception",
+    [
+        # Invalid show command
+        (
+            SHOW_VERSION,
+            "cisco_xe",
+            "show invalid-command",
+            NetmikoParsingException,
+        ),
+    ],
+)
+def test_parsing_errors_genie(raw_output, platform, command, exception):
+    """Verify that an error is raised if Genie parsing fails and `raise_parsing_error` is set."""
+    with pytest.raises(exception):
+        utilities.get_structured_data_genie(
+            raw_output, platform=platform, command=command, raise_parsing_error=True
+        )
+
+
+@pytest.mark.parametrize(
+    "max_loops,delay_factor,timeout,result",
+    [
+        (500, 1.0, 100, 100.0),  # Defaults, should be 100 seconds
+        (500, 1.0, 90, 90.0),  # Defaults except NAPALM overrode timeout
+        (500, 0.1, 100, 10.0),  # Defaults, fast_cli should be 10 seconds
+        (500, 5, 100, 500.0),  # delay_factor=5 (5x the total sleep)
+        (1500, 5, 100, 1500.0),  # delay_factor=5, max_loops=1500 (15x the total sleep)
+        (500, 2, 100, 200.0),  # delay_factor=2
+        (500, 10, 100, 1000.0),  # delay_factor=10
+    ],
+)
+def test_delay_factor_compat(max_loops, delay_factor, timeout, result):
+
+    read_timeout = utilities.calc_old_timeout(
+        max_loops=max_loops,
+        delay_factor=delay_factor,
+        loop_delay=0.2,
+        old_timeout=timeout,
+    )
+    assert read_timeout == result
+
+
+def test_nokia_context_filter():
+    data = [
+        "(ex)[configure aaa]",
+        "*(ex)[configure aaa]",
+        "!(ex)[configure aaa]",
+        "[]",
+        '(ex)[configure router "Base" bgp]',
+        "(ro)[]",
+        "(ex)[]",
+        '[show router "Base" bgp]',
+        '!*[pr:configure router "Base" bgp]',
+    ]
+
+    results = []
+
+    for test_case in data:
+        out = utilities.nokia_context_filter(test_case)
+        results.append(out)
+
+    # All strings in results should be null-string
+    assert any(results) is False
+
+    # Create a case that won't be stripped
+    test_case = 'foo[show router "Base" bgp]'
+    out = utilities.nokia_context_filter(test_case)
+    assert out != ""
+
+
+def test_check_serial_port_exact_match(monkeypatch):
+    """check_serial_port should return the port when an exact match is found."""
+    port1 = MagicMock()
+    port1.device = "/dev/ttyUSB0"
+    port2 = MagicMock()
+    port2.device = "/dev/ttyS0"
+    monkeypatch.setattr(
+        "netmiko.utilities.serial.tools.list_ports.comports", lambda: [port1, port2]
+    )
+    assert utilities.check_serial_port("/dev/ttyUSB0") == "/dev/ttyUSB0"
+    assert utilities.check_serial_port("/dev/ttyS0") == "/dev/ttyS0"
+
+
+def test_check_serial_port_no_partial_match(monkeypatch):
+    """check_serial_port should not match a port that is a substring of another."""
+    port1 = MagicMock()
+    port1.device = "COM9"
+    port2 = MagicMock()
+    port2.device = "COM99"
+    monkeypatch.setattr(
+        "netmiko.utilities.serial.tools.list_ports.comports", lambda: [port1, port2]
+    )
+    assert utilities.check_serial_port("COM9") == "COM9"
+    assert utilities.check_serial_port("COM99") == "COM99"
+
+
+def test_check_serial_port_not_found(monkeypatch):
+    """check_serial_port should raise ValueError when port is not found."""
+    port1 = MagicMock()
+    port1.device = "/dev/cu.Panther"
+    monkeypatch.setattr("netmiko.utilities.serial.tools.list_ports.comports", lambda: [port1])
+    with pytest.raises(ValueError, match="device /dev/cu.usbserial-1410 not found"):
+        utilities.check_serial_port("/dev/cu.usbserial-1410")
+
+
+def test_check_serial_port_multiple_matches(monkeypatch):
+    """check_serial_port should raise ValueError when multiple ports match."""
+    port1 = MagicMock()
+    port1.device = "COM9"
+    port2 = MagicMock()
+    port2.device = "COM9"
+    monkeypatch.setattr(
+        "netmiko.utilities.serial.tools.list_ports.comports", lambda: [port1, port2]
+    )
+    with pytest.raises(ValueError, match="Multiple ports found matching COM9"):
+        utilities.check_serial_port("COM9")

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="generator" content="pdoc3 0.11.1">
+<title>netmiko.utilities API documentation</title>
+<meta name="description" content="Miscellaneous utility functions.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:1.5em;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:2em 0 .50em 0}h3{font-size:1.4em;margin:1.6em 0 .7em 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .2s ease-in-out}a:visited{color:#503}a:hover{color:#b62}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900;font-weight:bold}pre code{font-size:.8em;line-height:1.4em;padding:1em;display:block}code{background:#f3f3f3;font-family:"DejaVu Sans Mono",monospace;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em 1em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul ul{padding-left:1em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-D9gUyxqja7hBtkWpPWGt9wfbfaMGVt9gnyCvYa+jojwwPHLCzUm5i8rpk7vD7wNee9bA35eYIjobYPaQuKS1MQ==" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => {
+hljs.configure({languages: ['bash', 'css', 'diff', 'graphql', 'ini', 'javascript', 'json', 'plaintext', 'python', 'python-repl', 'rust', 'shell', 'sql', 'typescript', 'xml', 'yaml']});
+hljs.highlightAll();
+})</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>netmiko.utilities</code></h1>
+</header>
+<section id="section-intro">
+<p>Miscellaneous utility functions.</p>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="netmiko.utilities.calc_old_timeout"><code class="name flex">
+<span>def <span class="ident">calc_old_timeout</span></span>(<span>max_loops: Optional[int] = None, delay_factor: Optional[float] = None, loop_delay: float = 0.2, old_timeout: int = 100) ‑> float</span>
+</code></dt>
+<dd>
+<div class="desc"><p>loop_delay is .2 in Netmiko 3.x
+delay_factor would multiple the loop delay
+Number of loops was typically 500</p>
+<p>Thus each loop would sleep (loop_delay * delay_factor) seconds
+That sleep would happen max_loops time</p>
+<p>Formula is (loop_delay * delay_factor) * max_loops</p>
+<p>There was a way Netmiko's self.timeout could override the default settings and essentially be
+used to adjust max_loops (this was probably rarely used).</p></div>
+</dd>
+<dt id="netmiko.utilities.check_serial_port"><code class="name flex">
+<span>def <span class="ident">check_serial_port</span></span>(<span>name: str) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"><p>returns valid COM Port.</p></div>
+</dd>
+<dt id="netmiko.utilities.clitable_to_dict"><code class="name flex">
+<span>def <span class="ident">clitable_to_dict</span></span>(<span>cli_table: textfsm.clitable.CliTable) ‑> List[Dict[str, str]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Converts TextFSM cli_table object to list of dictionaries.</p></div>
+</dd>
+<dt id="netmiko.utilities.display_inventory"><code class="name flex">
+<span>def <span class="ident">display_inventory</span></span>(<span>my_devices: Dict[str, Union[List[str], Dict[str, Any]]]) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Print out inventory devices and groups.</p></div>
+</dd>
+<dt id="netmiko.utilities.ensure_dir_exists"><code class="name flex">
+<span>def <span class="ident">ensure_dir_exists</span></span>(<span>verify_dir: str) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Ensure directory exists. Create if necessary.</p></div>
+</dd>
+<dt id="netmiko.utilities.f_exec_time"><code class="name flex">
+<span>def <span class="ident">f_exec_time</span></span>(<span>func: ~F) ‑> ~F</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="netmiko.utilities.find_cfg_file"><code class="name flex">
+<span>def <span class="ident">find_cfg_file</span></span>(<span>file_name: Union[str, bytes, ForwardRef('PathLike[Any]'), ForwardRef(None)] = None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Search for netmiko_tools inventory file in the following order:
+NETMIKO_TOOLS_CFG environment variable
+Current directory
+Home directory
+Look for file named: .netmiko.yml or netmiko.yml
+Also allow NETMIKO_TOOLS_CFG to point directly at a file</p></div>
+</dd>
+<dt id="netmiko.utilities.find_netmiko_dir"><code class="name flex">
+<span>def <span class="ident">find_netmiko_dir</span></span>(<span>) ‑> Tuple[str, str]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Check environment first, then default dir</p></div>
+</dd>
+<dt id="netmiko.utilities.get_structured_data"><code class="name flex">
+<span>def <span class="ident">get_structured_data</span></span>(<span>raw_output: str, platform: Optional[str] = None, command: Optional[str] = None, template: Optional[str] = None, raise_parsing_error: bool = False) ‑> Union[str, List[Dict[str, str]]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Convert raw CLI output to structured data using TextFSM template.</p>
+<p>You can use a straight TextFSM file i.e. specify "template". If no template is specified,
+then you must use an CliTable index file.</p></div>
+</dd>
+<dt id="netmiko.utilities.get_structured_data_genie"><code class="name flex">
+<span>def <span class="ident">get_structured_data_genie</span></span>(<span>raw_output: str, platform: str, command: str, raise_parsing_error: bool = False) ‑> Union[str, Dict[str, Any]]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="netmiko.utilities.get_structured_data_textfsm"><code class="name flex">
+<span>def <span class="ident">get_structured_data_textfsm</span></span>(<span>raw_output: str, platform: Optional[str] = None, command: Optional[str] = None, template: Optional[str] = None, raise_parsing_error: bool = False) ‑> Union[str, List[Dict[str, str]]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Convert raw CLI output to structured data using TextFSM template.</p>
+<p>You can use a straight TextFSM file i.e. specify "template". If no template is specified,
+then you must use an CliTable index file.</p></div>
+</dd>
+<dt id="netmiko.utilities.get_structured_data_ttp"><code class="name flex">
+<span>def <span class="ident">get_structured_data_ttp</span></span>(<span>raw_output: str, template: str, raise_parsing_error: bool = False) ‑> Union[str, List[Any]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Convert raw CLI output to structured data using TTP template.</p>
+<p>You can use a straight TextFSM file i.e. specify "template"</p></div>
+</dd>
+<dt id="netmiko.utilities.get_template_dir"><code class="name flex">
+<span>def <span class="ident">get_template_dir</span></span>(<span>) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Find and return the directory containing the TextFSM index file.</p>
+<p>Order of preference is:
+1) Find directory in <code>NET_TEXTFSM</code> Environment Variable.
+2) Check for pip installed <code>ntc-templates</code> location in this environment.
+3) ~/ntc-templates/ntc_templates/templates.</p>
+<p>If <code>index</code> file is not found in any of these locations, raise ValueError</p>
+<p>:return: directory containing the TextFSM index file</p></div>
+</dd>
+<dt id="netmiko.utilities.load_devices"><code class="name flex">
+<span>def <span class="ident">load_devices</span></span>(<span>file_name: Union[str, bytes, ForwardRef('PathLike[Any]'), ForwardRef(None)] = None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Find and load .netmiko.yml file.</p></div>
+</dd>
+<dt id="netmiko.utilities.load_netmiko_yml"><code class="name flex">
+<span>def <span class="ident">load_netmiko_yml</span></span>(<span>file_name: Union[str, bytes, ForwardRef('PathLike[Any]'), ForwardRef(None)] = None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Load and parse the .netmiko.yml as determined by 'find_cfg_file'.</p>
+<h2 id="parsing">Parsing</h2>
+<p>Retrieve and extract 'config' parameters: <strong>meta</strong> field
+Determine if encryption is being used and decrypt any encrypted fields</p></div>
+</dd>
+<dt id="netmiko.utilities.load_yaml_file"><code class="name flex">
+<span>def <span class="ident">load_yaml_file</span></span>(<span>yaml_file: Union[str, bytes, ForwardRef('PathLike[Any]')])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Read YAML file.</p></div>
+</dd>
+<dt id="netmiko.utilities.m_exec_time"><code class="name flex">
+<span>def <span class="ident">m_exec_time</span></span>(<span>func: ~F) ‑> ~F</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="netmiko.utilities.nokia_context_filter"><code class="name flex">
+<span>def <span class="ident">nokia_context_filter</span></span>(<span>data: str, re_flags: int = re.MULTILINE) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Nokia context from string. Examples:</p>
+<p>(ro)[]</p>
+<p>(ex)[configure router "Base" bgp]</p>
+<p>Converted over to a standalone function for easier unit testing.</p></div>
+</dd>
+<dt id="netmiko.utilities.obtain_all_devices"><code class="name flex">
+<span>def <span class="ident">obtain_all_devices</span></span>(<span>my_devices: Dict[str, Union[List[str], Dict[str, Any]]]) ‑> Dict[str, Dict[str, Any]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Dynamically create 'all' group.</p></div>
+</dd>
+<dt id="netmiko.utilities.obtain_netmiko_filename"><code class="name flex">
+<span>def <span class="ident">obtain_netmiko_filename</span></span>(<span>device_name: str) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create file name based on device_name.</p></div>
+</dd>
+<dt id="netmiko.utilities.run_ttp_template"><code class="name flex">
+<span>def <span class="ident">run_ttp_template</span></span>(<span>connection: BaseConnection, template: Union[str, bytes, ForwardRef('PathLike[Any]')], res_kwargs: Dict[str, Any], **kwargs: Any)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Helper function to run TTP template parsing.</p>
+<p>:param connection: Netmiko connection object</p>
+<p>:param template: TTP template</p>
+<p>:param res_kwargs: <code>**res_kwargs</code> arguments for TTP result method</p>
+<p>:param kwargs: <code>**kwargs</code> for TTP object instantiation</p></div>
+</dd>
+<dt id="netmiko.utilities.select_cmd_verify"><code class="name flex">
+<span>def <span class="ident">select_cmd_verify</span></span>(<span>func: ~F) ‑> ~F</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Override function cmd_verify argument with global setting.</p></div>
+</dd>
+<dt id="netmiko.utilities.structured_data_converter"><code class="name flex">
+<span>def <span class="ident">structured_data_converter</span></span>(<span>raw_data: str, command: str, platform: str, use_textfsm: bool = False, use_ttp: bool = False, use_genie: bool = False, textfsm_template: Optional[str] = None, ttp_template: Optional[str] = None, raise_parsing_error: bool = False) ‑> Union[str, List[Any], Dict[str, Any]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Try structured data converters in the following order: TextFSM, TTP, Genie.</p>
+<p>Return the first structured data found, else return the raw_data as-is unless
+<code>raise_parsing_error</code> is True, then bubble up the exception to the caller.</p></div>
+</dd>
+<dt id="netmiko.utilities.write_bytes"><code class="name flex">
+<span>def <span class="ident">write_bytes</span></span>(<span>out_data: ~AnyStr, encoding: str = 'utf-8') ‑> bytes</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Ensure output is properly encoded bytes.</p></div>
+</dd>
+<dt id="netmiko.utilities.write_tmp_file"><code class="name flex">
+<span>def <span class="ident">write_tmp_file</span></span>(<span>device_name: str, output: str) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="netmiko" href="index.html">netmiko</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="netmiko.utilities.calc_old_timeout" href="#netmiko.utilities.calc_old_timeout">calc_old_timeout</a></code></li>
+<li><code><a title="netmiko.utilities.check_serial_port" href="#netmiko.utilities.check_serial_port">check_serial_port</a></code></li>
+<li><code><a title="netmiko.utilities.clitable_to_dict" href="#netmiko.utilities.clitable_to_dict">clitable_to_dict</a></code></li>
+<li><code><a title="netmiko.utilities.display_inventory" href="#netmiko.utilities.display_inventory">display_inventory</a></code></li>
+<li><code><a title="netmiko.utilities.ensure_dir_exists" href="#netmiko.utilities.ensure_dir_exists">ensure_dir_exists</a></code></li>
+<li><code><a title="netmiko.utilities.f_exec_time" href="#netmiko.utilities.f_exec_time">f_exec_time</a></code></li>
+<li><code><a title="netmiko.utilities.find_cfg_file" href="#netmiko.utilities.find_cfg_file">find_cfg_file</a></code></li>
+<li><code><a title="netmiko.utilities.find_netmiko_dir" href="#netmiko.utilities.find_netmiko_dir">find_netmiko_dir</a></code></li>
+<li><code><a title="netmiko.utilities.get_structured_data" href="#netmiko.utilities.get_structured_data">get_structured_data</a></code></li>
+<li><code><a title="netmiko.utilities.get_structured_data_genie" href="#netmiko.utilities.get_structured_data_genie">get_structured_data_genie</a></code></li>
+<li><code><a title="netmiko.utilities.get_structured_data_textfsm" href="#netmiko.utilities.get_structured_data_textfsm">get_structured_data_textfsm</a></code></li>
+<li><code><a title="netmiko.utilities.get_structured_data_ttp" href="#netmiko.utilities.get_structured_data_ttp">get_structured_data_ttp</a></code></li>
+<li><code><a title="netmiko.utilities.get_template_dir" href="#netmiko.utilities.get_template_dir">get_template_dir</a></code></li>
+<li><code><a title="netmiko.utilities.load_devices" href="#netmiko.utilities.load_devices">load_devices</a></code></li>
+<li><code><a title="netmiko.utilities.load_netmiko_yml" href="#netmiko.utilities.load_netmiko_yml">load_netmiko_yml</a></code></li>
+<li><code><a title="netmiko.utilities.load_yaml_file" href="#netmiko.utilities.load_yaml_file">load_yaml_file</a></code></li>
+<li><code><a title="netmiko.utilities.m_exec_time" href="#netmiko.utilities.m_exec_time">m_exec_time</a></code></li>
+<li><code><a title="netmiko.utilities.nokia_context_filter" href="#netmiko.utilities.nokia_context_filter">nokia_context_filter</a></code></li>
+<li><code><a title="netmiko.utilities.obtain_all_devices" href="#netmiko.utilities.obtain_all_devices">obtain_all_devices</a></code></li>
+<li><code><a title="netmiko.utilities.obtain_netmiko_filename" href="#netmiko.utilities.obtain_netmiko_filename">obtain_netmiko_filename</a></code></li>
+<li><code><a title="netmiko.utilities.run_ttp_template" href="#netmiko.utilities.run_ttp_template">run_ttp_template</a></code></li>
+<li><code><a title="netmiko.utilities.select_cmd_verify" href="#netmiko.utilities.select_cmd_verify">select_cmd_verify</a></code></li>
+<li><code><a title="netmiko.utilities.structured_data_converter" href="#netmiko.utilities.structured_data_converter">structured_data_converter</a></code></li>
+<li><code><a title="netmiko.utilities.write_bytes" href="#netmiko.utilities.write_bytes">write_bytes</a></code></li>
+<li><code><a title="netmiko.utilities.write_tmp_file" href="#netmiko.utilities.write_tmp_file">write_tmp_file</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.11.1</a>.</p>
+</footer>
+</body>
+</html>
