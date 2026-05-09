@@ -3,13 +3,24 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+import socket
+import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import psutil
 import netmiko
-from netmiko.exceptions import NetMikoAuthenticationException, NetMikoTimeoutException
+from netmiko.exceptions import (
+    NetMikoAuthenticationException,
+    NetMikoTimeoutException,
+    ReadException,
+    ReadTimeout,
+)
+from netmiko.ssh_autodetect import SSHDetect
+from netmiko.utilities import get_structured_data_textfsm
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -41,6 +52,10 @@ class ActionError(RuntimeError):
 NETMIKO_EXCEPTIONS = (
     NetMikoTimeoutException,
     NetMikoAuthenticationException,
+    ReadException,
+    ReadTimeout,
+    socket.error,
+    OSError,
 )
 
 # ── Bantuan Keamanan ──────────────────────────────────────────────────────────
@@ -300,13 +315,12 @@ def build_connection_params(
     host: str | None = None,
     port: int | str | None = None,
     device_type: str | None = None,
+    log_session: bool = True,
 ) -> dict[str, Any]:
     """
     Buat dict parameter koneksi yang siap dipakai oleh Netmiko ConnectHandler.
-    Secara otomatis set session_log ke folder logs/ dengan timestamp.
+    Set log_session=False untuk koneksi singkat (polling) agar tidak menumpuk file log.
     """
-    device_id = device.get("id", "unknown")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     params = {
         "device_type": device_type or device["device_type"],
         "host": host or device["host"],
@@ -314,8 +328,11 @@ def build_connection_params(
         "username": username,
         "password": password,
         "fast_cli": True,
-        "session_log": str(LOGS_DIR / f"{device_id}_{timestamp}.log"),
     }
+    if log_session:
+        device_id = device.get("id", "unknown")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        params["session_log"] = str(LOGS_DIR / f"{device_id}_{timestamp}.log")
     if secret:
         params["secret"] = secret
     return params
@@ -351,21 +368,13 @@ def check_device_reachable(
     """
     Cek apakah device bisa dijangkau via SSH dengan mencoba buka koneksi singkat.
     Return: 'online' kalau sukses, 'offline' kalau timeout/auth gagal, 'unknown' kalau error lain.
+    log_session=False agar tidak menumpuk file log tiap polling.
     """
     try:
-        params = {
-            "device_type": device["device_type"],
-            "host": device["host"],
-            "port": int(device["port"]),
-            "username": username,
-            "password": password,
-            "timeout": timeout,
-            "banner_timeout": timeout,
-            "auth_timeout": timeout,  # penting! default Netmiko = 10s, wajib di-set biar tidak lama
-        }
-        if secret:
-            params["secret"] = secret
-
+        params = build_connection_params(device, username, password, secret, log_session=False)
+        params["timeout"] = timeout
+        params["banner_timeout"] = timeout
+        params["auth_timeout"] = timeout  # penting! default Netmiko = 10s, wajib di-set biar tidak lama
         conn = netmiko.ConnectHandler(**params)
         conn.disconnect()
         return "online"
@@ -436,16 +445,18 @@ def get_interface_summary(
     Coba parsing pakai TextFSM dulu; kalau gagal, fallback ke parser manual.
     Return: (list interface terstruktur, raw output CLI).
     """
+    actual_type = device_type or device["device_type"]
     connection = connect_device(device, username, password, secret, host, port, device_type)
     try:
-        # Coba TextFSM dulu untuk structured data otomatis
-        parsed = connection.send_command("show ip interface brief", use_textfsm=True)
         raw_output = connection.send_command("show ip interface brief")
+        try:
+            parsed = get_structured_data_textfsm(raw_output, platform=actual_type, command="show ip interface brief")
+        except Exception:
+            parsed = None
 
         if isinstance(parsed, list) and parsed:
             interfaces = [_normalize_textfsm_row(row) for row in parsed]
         else:
-            # TextFSM gagal / template tidak ditemukan → fallback ke parser manual
             interfaces = _parse_interface_brief_fallback(raw_output)
 
         return interfaces, raw_output
@@ -798,8 +809,13 @@ def get_device_detail(
         result.update(_parse_show_version(raw_version))
 
         try:
-            parsed_intf = connection.send_command("show ip interface brief", use_textfsm=True)
             raw_intf = connection.send_command("show ip interface brief")
+            try:
+                parsed_intf = get_structured_data_textfsm(
+                    raw_intf, platform=device["device_type"], command="show ip interface brief"
+                )
+            except Exception:
+                parsed_intf = None
             if isinstance(parsed_intf, list) and parsed_intf:
                 result["interfaces"] = [_normalize_textfsm_row(r) for r in parsed_intf]
             else:
@@ -822,3 +838,262 @@ def get_device_detail(
             except Exception:
                 pass
     return result
+
+
+# ── Network Auto-Scanner ──────────────────────────────────────────────────────
+
+def get_local_subnets() -> list[str]:
+    """Detect semua subnet lokal dari interface PC (skip loopback & link-local)."""
+    subnets: list[str] = []
+    for _iface, addrs in psutil.net_if_addrs().items():
+        for addr in addrs:
+            if addr.family != socket.AF_INET:
+                continue
+            ip = addr.address or ""
+            netmask = addr.netmask or ""
+            if not ip or ip.startswith("127.") or ip.startswith("169.254."):
+                continue
+            try:
+                network = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
+                s = str(network)
+                if s not in subnets:
+                    subnets.append(s)
+            except ValueError:
+                pass
+    return subnets
+
+
+def ping_host(ip: str) -> bool:
+    """Ping satu IP address. Return True kalau reachable (Windows: ping -n 1 -w 500)."""
+    try:
+        result = subprocess.run(
+            ["ping", "-n", "1", "-w", "500", ip],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def try_ssh_discover(
+    ip: str,
+    username: str,
+    password: str,
+    secret: str | None = None,
+) -> dict | None:
+    """
+    SSH ke IP, autodetect device_type via SSHDetect, ambil hostname dan CDP neighbors.
+    Return None kalau koneksi gagal atau bukan network device.
+    """
+    try:
+        autodetect_params = {
+            "device_type": "autodetect",
+            "host": ip,
+            "username": username,
+            "password": password,
+            "timeout": 8,
+            "banner_timeout": 8,
+            "auth_timeout": 8,
+        }
+        if secret:
+            autodetect_params["secret"] = secret
+
+        guesser = SSHDetect(**autodetect_params)
+        device_type = guesser.autodetect() or "cisco_ios"
+
+        conn_params = {
+            "device_type": device_type,
+            "host": ip,
+            "username": username,
+            "password": password,
+            "timeout": 8,
+            "banner_timeout": 8,
+            "auth_timeout": 8,
+        }
+        if secret:
+            conn_params["secret"] = secret
+
+        conn = netmiko.ConnectHandler(**conn_params)
+        try:
+            prompt = conn.find_prompt()
+            hostname = re.sub(r"[>#\s].*$", "", prompt).strip().lower()
+            if not hostname:
+                hostname = ip.replace(".", "_")
+
+            cdp_output = ""
+            try:
+                cdp_output = conn.send_command("show cdp neighbors detail", read_timeout=15)
+            except Exception:
+                pass
+
+            return {
+                "id": hostname,
+                "name": hostname,
+                "host": ip,
+                "port": 22,
+                "device_type": device_type,
+                "role": "router",
+                "enabled": True,
+                "cdp_output": cdp_output,
+            }
+        finally:
+            conn.disconnect()
+    except Exception:
+        return None
+
+
+def parse_cdp_neighbors(cdp_output: str, device_id: str) -> list[dict]:
+    """Parse output 'show cdp neighbors detail' → list link {from, from_intf, to, to_intf}."""
+    links: list[dict] = []
+    blocks = re.split(r"-{10,}", cdp_output)
+    for block in blocks:
+        neighbor_m = re.search(r"Device ID:\s*(\S+)", block)
+        intf_m = re.search(r"Interface:\s*(\S+?),\s*Port ID[^\:]*:\s*(\S+)", block)
+        if not neighbor_m or not intf_m:
+            continue
+        neighbor = re.sub(r"\.\S+$", "", neighbor_m.group(1).strip()).lower()
+        local_intf = intf_m.group(1).rstrip(",")
+        remote_intf = intf_m.group(2)
+        links.append({
+            "from": device_id,
+            "from_intf": local_intf,
+            "to": neighbor,
+            "to_intf": remote_intf,
+        })
+    return links
+
+
+def scan_network(
+    username: str,
+    password: str,
+    secret: str | None = None,
+    subnets: list[str] | None = None,
+) -> dict:
+    """
+    Auto-discover device di semua subnet lokal PC.
+    Return: {found, devices, links, subnets_scanned, errors}.
+    """
+    if subnets is None:
+        subnets = get_local_subnets()
+
+    if not subnets:
+        return {
+            "found": [],
+            "devices": [],
+            "links": [],
+            "subnets_scanned": [],
+            "errors": ["Tidak ada subnet lokal yang terdeteksi."],
+        }
+
+    # Ping sweep semua subnet secara paralel
+    all_ips: list[str] = []
+    for subnet_str in subnets:
+        try:
+            network = ipaddress.IPv4Network(subnet_str, strict=False)
+            if network.prefixlen < 16:
+                continue  # skip subnet terlalu besar (> /16)
+            all_ips.extend(str(h) for h in network.hosts())
+        except ValueError:
+            pass
+
+    live_ips: list[str] = []
+    with ThreadPoolExecutor(max_workers=64) as pool:
+        futures = {pool.submit(ping_host, ip): ip for ip in all_ips}
+        for future in as_completed(futures):
+            ip = futures[future]
+            try:
+                if future.result():
+                    live_ips.append(ip)
+            except Exception:
+                pass
+
+    # SSH discover tiap live IP secara paralel
+    raw_devices: list[dict] = []
+    errors: list[str] = []
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        futures = {pool.submit(try_ssh_discover, ip, username, password, secret): ip for ip in live_ips}
+        for future in as_completed(futures):
+            ip = futures[future]
+            try:
+                result = future.result()
+                if result:
+                    raw_devices.append(result)
+                else:
+                    errors.append(f"{ip}: SSH gagal atau bukan network device")
+            except Exception as exc:
+                errors.append(f"{ip}: {exc}")
+
+    # Dedup device berdasarkan id
+    seen_ids: set[str] = set()
+    unique_devices: list[dict] = []
+    for dev in raw_devices:
+        if dev["id"] not in seen_ids:
+            seen_ids.add(dev["id"])
+            unique_devices.append(dev)
+
+    # Bangun links dari CDP, lalu dedup pair (A→B sama dengan B→A)
+    all_links: list[dict] = []
+    for dev in unique_devices:
+        cdp_output = dev.pop("cdp_output", "")
+        if cdp_output:
+            all_links.extend(parse_cdp_neighbors(cdp_output, dev["id"]))
+
+    seen_pairs: set[frozenset] = set()
+    unique_links: list[dict] = []
+    for link in all_links:
+        pair = frozenset([link["from"], link["to"]])
+        if pair not in seen_pairs:
+            seen_pairs.add(pair)
+            unique_links.append(link)
+
+    return {
+        "found": [dev["id"] for dev in unique_devices],
+        "devices": unique_devices,
+        "links": unique_links,
+        "subnets_scanned": subnets,
+        "errors": errors,
+    }
+
+
+# ── Batch Raw CLI ─────────────────────────────────────────────────────────────
+
+def batch_raw_cli(
+    device_ids: list[str],
+    commands: list[str],
+    inventory: list[dict[str, Any]],
+    username: str,
+    password: str,
+    secret: str | None = None,
+) -> dict[str, list[dict]]:
+    """
+    Kirim raw CLI config commands ke beberapa device sekaligus secara paralel.
+    Satu koneksi SSH per device, semua commands dikirim via send_config_set().
+    Return: {successful: [{device, output}], failed: [{device, error}]}.
+    """
+    results: dict[str, list[dict]] = {"successful": [], "failed": []}
+
+    def _exec(device_id: str) -> tuple[str, bool, str]:
+        try:
+            device = find_device(inventory, device_id)
+            conn = connect_device(device, username, password, secret)
+            try:
+                output = conn.send_config_set(commands)
+                conn.save_config()
+                return device_id, True, output
+            finally:
+                conn.disconnect()
+        except (InventoryError, ConnectionError, ActionError, Exception) as exc:
+            return device_id, False, str(exc)
+
+    with ThreadPoolExecutor(max_workers=len(device_ids) or 1) as pool:
+        futures = {pool.submit(_exec, did): did for did in device_ids}
+        for future in as_completed(futures):
+            device_id, ok, output = future.result()
+            if ok:
+                results["successful"].append({"device": device_id, "output": output})
+            else:
+                results["failed"].append({"device": device_id, "error": output})
+
+    return results

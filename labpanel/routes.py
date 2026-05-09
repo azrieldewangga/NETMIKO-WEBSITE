@@ -16,6 +16,7 @@ from automation import (
     InventoryError,
     add_device_to_inventory,
     apply_interface_action,
+    batch_raw_cli,
     check_device_reachable,
     execute_batch,
     execute_terminal_command,
@@ -26,6 +27,7 @@ from automation import (
     load_inventory,
     log_activity,
     parse_batch_rows,
+    scan_network,
     update_inventory_device,
 )
 
@@ -543,6 +545,78 @@ def register_routes(app):
             return jsonify({"ok": True, "message": f"Device '{device_data['id']}' berhasil ditambahkan."})
         except InventoryError as exc:
             return jsonify({"ok": False, "message": str(exc)}), 400
+
+    @app.route("/api/topology/scan", methods=["POST"])
+    @login_required
+    def api_topology_scan():
+        """Auto-scan semua subnet lokal untuk menemukan router aktif via SSH + CDP."""
+        username = current_app.config["LAB_DEVICE_USERNAME"]
+        password = current_app.config["LAB_DEVICE_PASSWORD"]
+        secret = current_app.config["LAB_DEVICE_SECRET"] or None
+
+        result = scan_network(username, password, secret)
+
+        if result["found"]:
+            raw = automation._load_raw_inventory(_get_inventory_path())
+            raw["devices"] = result["devices"]
+            raw["links"] = result["links"]
+            automation._save_raw_inventory(raw, _get_inventory_path())
+
+        return jsonify({
+            "ok": True,
+            "found": result["found"],
+            "links": result["links"],
+            "subnets_scanned": result["subnets_scanned"],
+            "errors": result.get("errors", []),
+            "message": f"Ditemukan {len(result['found'])} device, {len(result['links'])} link CDP.",
+        })
+
+    @app.route("/batch/raw", methods=["POST"])
+    @login_required
+    def batch_raw():
+        """Eksekusi raw Cisco CLI ke beberapa device sekaligus (JSON response untuk AJAX)."""
+        inventory_data = load_inventory(_get_inventory_path())
+        inventory = inventory_data["devices"]
+
+        username = (
+            request.form.get("device_username")
+            or session.get("global_username")
+            or current_app.config["LAB_DEVICE_USERNAME"]
+        ).strip()
+        password = (
+            request.form.get("device_password")
+            or session.get("global_password")
+            or current_app.config["LAB_DEVICE_PASSWORD"]
+        )
+        secret = (
+            request.form.get("device_secret")
+            or session.get("global_secret")
+            or current_app.config["LAB_DEVICE_SECRET"]
+        ) or None
+
+        raw_text = (request.form.get("raw_cli") or "").strip()
+        if not raw_text:
+            return jsonify({"ok": False, "error": "Raw CLI tidak boleh kosong."})
+
+        import re as _re
+        device_match = _re.match(r"\[([^\]]+)\]", raw_text)
+        if not device_match:
+            return jsonify({"ok": False, "error": "Format tidak valid. Awali dengan [device1, device2]."})
+
+        device_ids = [d.strip() for d in device_match.group(1).split(",") if d.strip()]
+        commands = [line for line in raw_text[device_match.end():].strip().splitlines() if line.strip()]
+
+        if not device_ids or not commands:
+            return jsonify({"ok": False, "error": "Device ID atau commands kosong."})
+
+        results = batch_raw_cli(device_ids, commands, inventory, username, password, secret)
+
+        for r in results.get("successful", []):
+            log_activity(r["device"], "INFO", "batch_raw_cli", f"{len(commands)} commands", user=session.get("web_username"))
+        for r in results.get("failed", []):
+            log_activity(r["device"], "ERROR", "batch_raw_cli", r["error"], user=session.get("web_username"))
+
+        return jsonify({"ok": True, "results": results})
 
     # ── TERMINAL ─────────────────────────────────────────────
 

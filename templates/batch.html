@@ -36,65 +36,154 @@
   </div>
 </div>
 
-<!-- ── BATCH CONFIG CARD: Form utama untuk input perintah batch ── -->
+<!-- ── BATCH CONFIG CARD: Form utama dengan dua mode (CSV & Raw CLI) ── -->
 <div class="card" style="margin-bottom:20px;">
-  <div class="card-header">
-    <div>
-      <div class="card-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px; margin-right:5px;">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-        </svg>
-        Konfigurasi Batch
-      </div>
-      <div class="card-subtitle">Format: <code>device1;device2, interface, action, value</code></div>
-    </div>
+
+  <!-- Tab switcher -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;">
+    <button type="button" id="tabCsvBtn"
+      onclick="switchTab('csv')"
+      style="padding:8px 18px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);font-family:var(--font-body);">
+      CSV Mode
+    </button>
+    <button type="button" id="tabRawBtn"
+      onclick="switchTab('raw')"
+      style="padding:8px 18px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--font-body);">
+      Raw CLI Mode
+    </button>
   </div>
 
-  <form method="post" id="batchForm">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <!-- ── TAB CSV ── -->
+  <div id="tabCsv">
+    <div class="card-header" style="margin-bottom:16px;">
+      <div>
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px; margin-right:5px;">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          Konfigurasi Batch
+        </div>
+        <div class="card-subtitle">Format: <code>device1;device2, interface, action, value</code></div>
+      </div>
+    </div>
 
-    <!-- Kredensial SSH bisa dilipat/dikembangkan (details/summary),
-         otomatis terbuka kalau belum ada password tersimpan di session -->
+    <form method="post" id="batchForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <details {% if not session.get('global_password') %}open{% endif %} style="margin-bottom:16px;">
+        <summary>Kredensial SSH</summary>
+        <p class="muted small" style="margin:6px 0 12px;">Opsional jika sudah di-set via SSH Credentials di sidebar.</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="device_username">Username</label>
+            <input id="device_username" name="device_username"
+              value="{{ default_device_username }}" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="device_password">Password</label>
+            <input id="device_password" name="device_password" type="password"
+              placeholder="Isi untuk memperbarui" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="device_secret">Enable Secret</label>
+            <input id="device_secret" name="device_secret" type="password" placeholder="Opsional">
+          </div>
+        </div>
+      </details>
+
+      <hr style="margin-bottom:16px;">
+
+      <label for="batch_rows">Batch Rows</label>
+      <p class="muted small" style="margin-bottom:10px; margin-top:4px;">
+        Contoh: <code>r1;r2, GigabitEthernet0/0, change, 192.168.10.1/24</code>
+        &nbsp;—&nbsp; <code>r1,,ssh_port,2022</code>
+      </p>
+      <textarea id="batch_rows" name="batch_rows" rows="8"
+        placeholder="r1, GigabitEthernet0/0, add, 192.168.10.1/24&#10;r1;r2, Loopback0, description, ke-upstream">{% if batch_rows %}{% for r in batch_rows %}{{ r.device_ids | join(';') }},{{ r.interface }},{{ r.action }},{{ r.value }}
+{% endfor %}{% endif %}</textarea>
+
+      <div class="actions actions-end" style="margin-top:16px;">
+        <button type="submit" id="execBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Execute
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ── TAB RAW CLI ── -->
+  <div id="tabRaw" style="display:none;">
+    <div class="card-header" style="margin-bottom:16px;">
+      <div>
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px; margin-right:5px;">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          Raw CLI Mode
+        </div>
+        <div class="card-subtitle">Kirim perintah Cisco native langsung via <code>send_config_set()</code></div>
+      </div>
+    </div>
+
+    <div class="alert" style="background:var(--warning-bg);border:1px solid var(--warning-border);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <div style="font-size:12px;color:var(--warning);line-height:1.5;">
+        <strong>Perhatian:</strong> Perintah dikirim langsung ke device tanpa validasi. Pastikan sudah benar sebelum execute.
+      </div>
+    </div>
+
     <details {% if not session.get('global_password') %}open{% endif %} style="margin-bottom:16px;">
       <summary>Kredensial SSH</summary>
-      <p class="muted small" style="margin:6px 0 12px;">Opsional jika sudah di-set via SSH Credentials di sidebar.</p>
-      <div class="form-row">
+      <div class="form-row" style="margin-top:10px;">
         <div class="form-group">
-          <label for="device_username">Username</label>
-          <input id="device_username" name="device_username"
+          <label for="raw_username">Username</label>
+          <input id="raw_username" name="raw_device_username"
             value="{{ default_device_username }}" autocomplete="off">
         </div>
         <div class="form-group">
-          <label for="device_password">Password</label>
-          <input id="device_password" name="device_password" type="password"
+          <label for="raw_password">Password</label>
+          <input id="raw_password" name="raw_device_password" type="password"
             placeholder="Isi untuk memperbarui" autocomplete="new-password">
         </div>
         <div class="form-group">
-          <label for="device_secret">Enable Secret</label>
-          <input id="device_secret" name="device_secret" type="password" placeholder="Opsional">
+          <label for="raw_secret">Enable Secret</label>
+          <input id="raw_secret" name="raw_device_secret" type="password" placeholder="Opsional">
         </div>
       </div>
     </details>
 
     <hr style="margin-bottom:16px;">
 
-    <label for="batch_rows">Batch Rows</label>
+    <label for="raw_cli">Raw CLI</label>
     <p class="muted small" style="margin-bottom:10px; margin-top:4px;">
-      Contoh: <code>r1;r2, GigabitEthernet0/0, change, 192.168.10.1/24</code>
-      &nbsp;—&nbsp; <code>r1,,ssh_port,2022</code>
+      Baris pertama: <code>[device1, device2]</code> — lalu perintah Cisco IOS per baris.
     </p>
-    <textarea id="batch_rows" name="batch_rows" rows="8"
-      placeholder="r1, GigabitEthernet0/0, add, 192.168.10.1/24&#10;r1;r2, Loopback0, description, ke-upstream">{% if batch_rows %}{% for r in batch_rows %}{{ r.device_ids | join(';') }},{{ r.interface }},{{ r.action }},{{ r.value }}
-{% endfor %}{% endif %}</textarea>
+    <textarea id="raw_cli" rows="10"
+      style="font-family:var(--font-mono);font-size:13px;"
+      placeholder="[r1, r2]&#10;interface GigabitEthernet0/0&#10; ip address 192.168.10.1 255.255.255.0&#10; no shutdown&#10;&#10;[r3]&#10;router ospf 1&#10; network 10.0.0.0 0.0.0.255 area 0"></textarea>
 
-    <!-- Tombol Execute diletakkan kanan — trigger POST batch form -->
+    <div id="rawConfirmBanner" style="display:none;background:var(--warning-bg);border:1px solid var(--warning-border);border-radius:var(--r);padding:10px 14px;margin-top:14px;font-size:13px;color:var(--warning);">
+      Yakin ingin mengirim perintah ini ke device? Aksi ini tidak bisa di-undo.
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button type="button" id="rawConfirmBtn" style="background:var(--danger);color:#fff;border:none;padding:6px 14px;border-radius:var(--r);cursor:pointer;font-family:var(--font-body);font-size:12px;">Ya, Execute</button>
+        <button type="button" onclick="cancelRawConfirm()" class="secondary" style="font-size:12px;padding:5px 12px;">Batal</button>
+      </div>
+    </div>
+
     <div class="actions actions-end" style="margin-top:16px;">
-      <button type="submit" id="execBtn">
+      <button type="button" id="rawExecBtn" onclick="confirmRawExec()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Execute
+        Execute Raw CLI
       </button>
     </div>
-  </form>
+
+    <!-- Hasil raw CLI execution -->
+    <div id="rawResults" style="display:none; margin-top:20px;"></div>
+  </div>
+
 </div>
 
 <!-- ── DUA KOLOM DI BAWAH: Inventory (kiri) | Hasil Eksekusi (kanan) ── -->
@@ -123,10 +212,12 @@
             <td><code>{{ device.host }}</code></td>
             <td><span class="badge badge-{{ rc }}">{{ device.role }}</span></td>
             <td>
-              {% if device.enabled %}
-              <span class="status-dot green" style="display:inline-block; vertical-align:middle; margin-right:4px;"></span>Aktif
+              {% if device.status == 'online' %}
+              <span class="status-dot green" style="display:inline-block; vertical-align:middle; margin-right:4px;"></span>Online
+              {% elif device.status == 'offline' %}
+              <span class="status-dot red"   style="display:inline-block; vertical-align:middle; margin-right:4px;"></span>Offline
               {% else %}
-              <span class="status-dot red"   style="display:inline-block; vertical-align:middle; margin-right:4px;"></span>Nonaktif
+              <span class="status-dot grey"  style="display:inline-block; vertical-align:middle; margin-right:4px;"></span>Unknown
               {% endif %}
             </td>
           </tr>
@@ -300,18 +391,125 @@ r1;r2,, ssh_port, 2022</pre>
 
 {% block scripts %}
 <script>
-  /* Buka/tutup modal Command Reference */
+  /* ── Tab Switcher ── */
+  function switchTab(tab) {
+    var csvTab = document.getElementById("tabCsv");
+    var rawTab = document.getElementById("tabRaw");
+    var csvBtn = document.getElementById("tabCsvBtn");
+    var rawBtn = document.getElementById("tabRawBtn");
+
+    if (tab === "csv") {
+      csvTab.style.display = "";
+      rawTab.style.display = "none";
+      csvBtn.style.borderBottomColor = "var(--accent)";
+      csvBtn.style.color = "var(--accent)";
+      rawBtn.style.borderBottomColor = "transparent";
+      rawBtn.style.color = "var(--muted)";
+    } else {
+      csvTab.style.display = "none";
+      rawTab.style.display = "";
+      rawBtn.style.borderBottomColor = "var(--accent)";
+      rawBtn.style.color = "var(--accent)";
+      csvBtn.style.borderBottomColor = "transparent";
+      csvBtn.style.color = "var(--muted)";
+    }
+  }
+
+  /* ── Raw CLI Confirm & Execute ── */
+  function confirmRawExec() {
+    var text = document.getElementById("raw_cli").value.trim();
+    if (!text) { alert("Raw CLI tidak boleh kosong."); return; }
+    document.getElementById("rawConfirmBanner").style.display = "";
+    document.getElementById("rawExecBtn").style.display = "none";
+
+    document.getElementById("rawConfirmBtn").onclick = function() {
+      executeRawCli();
+    };
+  }
+
+  function cancelRawConfirm() {
+    document.getElementById("rawConfirmBanner").style.display = "none";
+    document.getElementById("rawExecBtn").style.display = "";
+  }
+
+  function executeRawCli() {
+    var rawText = document.getElementById("raw_cli").value.trim();
+    var username = document.getElementById("raw_username").value.trim();
+    var password = document.getElementById("raw_password").value;
+    var secret   = document.getElementById("raw_secret").value;
+
+    document.getElementById("rawConfirmBanner").style.display = "none";
+    var resultsDiv = document.getElementById("rawResults");
+    resultsDiv.style.display = "";
+    resultsDiv.innerHTML = '<p class="muted small" style="padding:10px 0;">Mengirim perintah... harap tunggu.</p>';
+
+    var formData = new FormData();
+    formData.append("csrf_token", "{{ csrf_token() }}");
+    formData.append("raw_cli", rawText);
+    if (username) formData.append("device_username", username);
+    if (password) formData.append("device_password", password);
+    if (secret)   formData.append("device_secret", secret);
+
+    fetch("{{ url_for('batch_raw') }}", { method: "POST", body: formData })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        document.getElementById("rawExecBtn").style.display = "";
+        if (!data.ok) {
+          resultsDiv.innerHTML = '<p class="text-error" style="font-size:13px;">' + (data.error || "Gagal.") + '</p>';
+          return;
+        }
+        var res = data.results;
+        var html = "";
+
+        /* Berhasil */
+        html += '<div class="results-block"><div class="results-head ok">';
+        html += '<span class="results-count">Berhasil</span>';
+        html += '<span class="badge badge-success">' + res.successful.length + '</span></div>';
+        if (res.successful.length) {
+          html += '<div class="results-table-wrap"><table><thead><tr><th>Device</th><th>Output (ringkas)</th></tr></thead><tbody>';
+          res.successful.forEach(function(r) {
+            var preview = (r.output || "").replace(/</g,"&lt;").replace(/>/g,"&gt;").substring(0, 120);
+            html += '<tr class="row-ok"><td><strong>' + r.device + '</strong></td><td><code style="font-size:11px;">' + preview + '…</code></td></tr>';
+          });
+          html += '</tbody></table></div>';
+        } else {
+          html += '<div class="results-table-wrap" style="padding:14px 16px;"><p class="muted small">Tidak ada yang berhasil.</p></div>';
+        }
+        html += '</div>';
+
+        /* Gagal */
+        html += '<div class="results-block"><div class="results-head fail">';
+        html += '<span class="results-count">Gagal</span>';
+        html += '<span class="badge badge-danger">' + res.failed.length + '</span></div>';
+        if (res.failed.length) {
+          html += '<div class="results-table-wrap"><table><thead><tr><th>Device</th><th>Error</th></tr></thead><tbody>';
+          res.failed.forEach(function(r) {
+            html += '<tr class="row-fail"><td><strong>' + r.device + '</strong></td><td class="text-error">' + (r.error || "-") + '</td></tr>';
+          });
+          html += '</tbody></table></div>';
+        } else {
+          html += '<div class="results-table-wrap" style="padding:14px 16px;"><p class="muted small" style="color:var(--success);">Semua berhasil!</p></div>';
+        }
+        html += '</div>';
+
+        resultsDiv.innerHTML = html;
+      })
+      .catch(function(err) {
+        document.getElementById("rawExecBtn").style.display = "";
+        resultsDiv.innerHTML = '<p class="text-error" style="font-size:13px;">Network error: ' + err.message + '</p>';
+      });
+  }
+
+  /* ── Modal Command Reference ── */
   function openCommandModal()  { document.getElementById("commandModal").style.display = "flex"; }
   function closeCommandModal() { document.getElementById("commandModal").style.display = "none"; }
 
   document.addEventListener("DOMContentLoaded", function () {
-    /* Klik di luar modal → tutup modal */
     var overlay = document.getElementById("commandModal");
     if (overlay) overlay.addEventListener("click", function(e) {
       if (e.target === overlay) closeCommandModal();
     });
 
-    /* Disable tombol Execute dan ganti teks-nya saat form disubmit, biar tidak klik dua kali */
     var form = document.getElementById("batchForm");
     if (form) form.addEventListener("submit", function () {
       var btn = document.getElementById("execBtn");

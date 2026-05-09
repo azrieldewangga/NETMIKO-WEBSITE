@@ -167,7 +167,12 @@
 {% block scripts %}
 <script>
   var cmdHistory = [], historyIdx = -1;
-  var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+  /* Bug fix: null check agar tidak crash kalau meta tag CSRF tidak ada */
+  var _csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  var CSRF_TOKEN = _csrfMeta ? _csrfMeta.getAttribute('content') : '';
+
+  var SESSION_HISTORY_KEY = 'terminal_history_{{ terminal_device.id if terminal_device else "none" }}';
 
   function escapeHtml(str) {
     return String(str)
@@ -184,10 +189,26 @@
     out.scrollTop = out.scrollHeight;
   }
 
+  /* Bug fix: clearTerminal hanya hapus output, bukan banner "Terhubung ke..." */
   function clearTerminal() {
-    document.getElementById('terminalOutput').innerHTML = '';
+    var out = document.getElementById('terminalOutput');
+    var toRemove = out.querySelectorAll('.term-cmd, .term-output, .term-error');
+    toRemove.forEach(function(el) { el.remove(); });
   }
 
+  function saveHistory() {
+    try { sessionStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(cmdHistory)); } catch(e) {}
+  }
+
+  function loadHistory() {
+    try {
+      var saved = sessionStorage.getItem(SESSION_HISTORY_KEY);
+      if (saved) cmdHistory = JSON.parse(saved);
+    } catch(e) {}
+    historyIdx = cmdHistory.length;
+  }
+
+  /* Bug fix: pisahkan JSON.stringify(cmd) untuk onclick dari escapeHtml(cmd) untuk display */
   function updateHistoryPanel() {
     var panel = document.getElementById('historyList');
     if (!panel) return;
@@ -196,7 +217,7 @@
       return;
     }
     panel.innerHTML = cmdHistory.slice(-8).reverse().map(function(cmd) {
-      return '<span style="cursor:pointer;color:var(--muted);transition:color .1s;" onclick="fillCommand(' + JSON.stringify(escapeHtml(cmd)) + ')" onmouseenter="this.style.color=\'var(--text)\'" onmouseleave="this.style.color=\'var(--muted)\'">' + escapeHtml(cmd) + '</span>';
+      return '<span style="cursor:pointer;color:var(--muted);transition:color .1s;" onclick="fillCommand(' + JSON.stringify(cmd) + ')" onmouseenter="this.style.color=\'var(--text)\'" onmouseleave="this.style.color=\'var(--muted)\'">' + escapeHtml(cmd) + '</span>';
     }).join('');
   }
 
@@ -216,6 +237,7 @@
     appendToTerminal('$ ' + cmd, 'cmd');
     cmdHistory.push(cmd);
     historyIdx = cmdHistory.length;
+    saveHistory();
     updateHistoryPanel();
     input.value = '';
 
@@ -247,6 +269,10 @@
   }
 
   document.addEventListener('DOMContentLoaded', function() {
+    /* Bug fix: load history dari sessionStorage saat page load */
+    loadHistory();
+    updateHistoryPanel();
+
     var input = document.getElementById('termInput');
     if (input) {
       input.addEventListener('keydown', function(e) {
