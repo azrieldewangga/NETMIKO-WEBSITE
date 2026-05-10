@@ -1533,6 +1533,7 @@ hr {
 .term-cmd    { color: #86EFAC; opacity: 0.75; }
 .term-output { color: #4ADE80; }
 .term-error  { color: #F87171; }
+.term-noout  { color: #6B7280; font-style: italic; }
 
 .term-input-bar {
   display: flex;

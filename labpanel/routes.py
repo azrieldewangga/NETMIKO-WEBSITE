@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import math
 import threading
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import wraps
 from pathlib import Path
@@ -21,7 +23,8 @@ from automation import (
     check_device_reachable,
     discover_topology,
     execute_batch,
-    execute_terminal_command,
+    open_terminal_session,
+    terminal_send,
     find_device,
     get_activity_log,
     get_device_detail,
@@ -101,6 +104,114 @@ def _get_connection_fields(form=None, device=None) -> dict[str, str]:
     }
 
 
+# ── Device Status Cache ───────────────────────────────────────────────────────
+
+_STATUS_TTL = 120  # 2 menit
+_status_cache: dict[str, str] = {}   # {str(device_id): "online"/"offline"/"unknown"}
+_status_lock = threading.Lock()
+_status_refresh_alive = False
+
+
+def _refresh_status_once(app) -> None:
+    """SSH ke semua device paralel, update cache. Tidak butuh Flask request context."""
+    try:
+        inv_data = automation.load_inventory(Path(app.config["INVENTORY_PATH"]))
+        devices = inv_data.get("devices", [])
+        username = app.config["LAB_DEVICE_USERNAME"]
+        password = app.config["LAB_DEVICE_PASSWORD"]
+        secret = app.config["LAB_DEVICE_SECRET"]
+    except Exception:
+        return
+
+    if not devices:
+        return
+
+    def _check(device):
+        if not device.get("enabled"):
+            return str(device["id"]), "offline"
+        status = check_device_reachable(device, username=username, password=password,
+                                        secret=secret, timeout=4)
+        level = "INFO" if status == "online" else "WARNING"
+        last = get_activity_log(device["id"], limit=1)
+        last_status = last[0].get("detail") if last and last[0].get("action") == "connectivity_check" else None
+        if last_status != status:
+            log_activity(device["id"], level, "connectivity_check", status)
+        return str(device["id"]), status
+
+    with ThreadPoolExecutor(max_workers=len(devices)) as pool:
+        futures = {pool.submit(_check, d): d for d in devices}
+        new_cache: dict[str, str] = {}
+        for future in as_completed(futures):
+            dev_id, status = future.result()
+            new_cache[dev_id] = status
+
+    with _status_lock:
+        _status_cache.clear()
+        _status_cache.update(new_cache)
+
+
+def _start_status_refresh_loop(app) -> None:
+    """Loop background: refresh cache sekarang lalu setiap _STATUS_TTL detik."""
+    global _status_refresh_alive
+    _status_refresh_alive = True
+    while _status_refresh_alive:
+        _refresh_status_once(app)
+        for _ in range(_STATUS_TTL):
+            if not _status_refresh_alive:
+                break
+            time.sleep(1)
+
+
+def _get_device_statuses(devices: list[dict]) -> dict[str, str]:
+    """Baca status dari cache. Kalau belum ada datanya, kembalikan 'unknown'."""
+    with _status_lock:
+        cached = dict(_status_cache)
+    return {str(d["id"]): cached.get(str(d["id"]), "unknown") for d in devices}
+
+
+# ── Interface Summary Cache ───────────────────────────────────────────────────
+
+_IFACE_TTL = 120  # 2 menit
+_iface_cache: dict[str, dict] = {}  # {device_id: {"ts": float, "interfaces": list, "raw": str}}
+_iface_lock = threading.Lock()
+
+
+def _get_cached_iface(device_id: str):
+    with _iface_lock:
+        entry = _iface_cache.get(str(device_id))
+    if entry and (time.time() - entry["ts"]) < _IFACE_TTL:
+        return entry["interfaces"], entry["raw"]
+    return None, None
+
+
+def _set_cached_iface(device_id: str, interfaces: list, raw_output: str) -> None:
+    with _iface_lock:
+        _iface_cache[str(device_id)] = {"ts": time.time(), "interfaces": interfaces, "raw": raw_output}
+
+
+def _invalidate_cached_iface(device_id: str) -> None:
+    with _iface_lock:
+        _iface_cache.pop(str(device_id), None)
+
+
+# ── Terminal Shell Sessions ───────────────────────────────────────────────────
+# Persistent Netmiko connections per web session, keyed by UUID.
+# Memungkinkan conf t → ip address → end berjalan di satu SSH session yang sama.
+
+_shell_sessions: dict[str, dict] = {}  # {shell_id: {"conn": ..., "device": dict}}
+_shell_sessions_lock = threading.Lock()
+
+
+def _close_shell(shell_id: str) -> None:
+    with _shell_sessions_lock:
+        data = _shell_sessions.pop(shell_id, None)
+    if data:
+        try:
+            data["conn"].disconnect()
+        except Exception:
+            pass
+
+
 # ── Background Network Scan ───────────────────────────────────────────────────
 
 _scan_lock = threading.Lock()
@@ -153,6 +264,10 @@ def login_required(view):
 
 
 def register_routes(app):
+    # Jalankan background status-refresh loop sekali saat app start
+    t = threading.Thread(target=_start_status_refresh_loop, args=(app,), daemon=True)
+    t.start()
+
     @app.route("/")
     @login_required
     def dashboard():
@@ -168,33 +283,10 @@ def register_routes(app):
         switch_info = inventory_data.get(
             "switch", {"name": "switch", "host": ""})
 
-        # Check real device connectivity secara paralel (threading)
-        default_username = current_app.config["LAB_DEVICE_USERNAME"]
-        default_password = current_app.config["LAB_DEVICE_PASSWORD"]
-        default_secret = current_app.config["LAB_DEVICE_SECRET"]
-
-        def _check(device):
-            if device.get("enabled"):
-                status = check_device_reachable(
-                    device,
-                    username=default_username,
-                    password=default_password,
-                    secret=default_secret,
-                    timeout=3.5,
-                )
-                level = "INFO" if status == "online" else "WARNING"
-                last = get_activity_log(device["id"], limit=1)
-                last_status = last[0].get("detail") if last and last[0].get("action") == "connectivity_check" else None
-                if last_status != status:
-                    log_activity(device["id"], level, "connectivity_check", status)
-                return device, status
-            return device, "offline"
-
-        with ThreadPoolExecutor(max_workers=len(devices) or 1) as pool:
-            futures = {pool.submit(_check, d): d for d in devices}
-            for future in as_completed(futures):
-                dev, status = future.result()
-                dev["status"] = status
+        # Ambil status dari cache (direfresh background setiap 2 menit — tidak blocking)
+        statuses = _get_device_statuses(devices)
+        for device in devices:
+            device["status"] = statuses.get(str(device["id"]), "unknown")
 
         # Layout topologi dinamis: tetap rapi walau jumlah router bertambah.
         topo_cx, topo_cy, topo_radius = 250, 195, 116
@@ -301,15 +393,21 @@ def register_routes(app):
             if action and destructive and not confirmed:
                 # Balik ke halaman buat nampilin flag konfirmasi
                 username, password, secret = _get_device_credentials(device_id)
-                try:
-                    interfaces, raw_output = get_interface_summary(
-                        device, username=username, password=password, secret=secret,
-                        host=connection["host"], port=connection["port"],
-                        device_type=connection["device_type"],
-                    )
+                cached_ifaces, cached_raw = _get_cached_iface(device_id)
+                if cached_ifaces is not None:
+                    interfaces, raw_output = cached_ifaces, cached_raw
                     connected = True
-                except (automation.ConnectionError, ValueError) as exc:
-                    error = str(exc)
+                else:
+                    try:
+                        interfaces, raw_output = get_interface_summary(
+                            device, username=username, password=password, secret=secret,
+                            host=connection["host"], port=connection["port"],
+                            device_type=connection["device_type"],
+                        )
+                        _set_cached_iface(device_id, interfaces, raw_output)
+                        connected = True
+                    except (automation.ConnectionError, ValueError) as exc:
+                        error = str(exc)
                 return render_template(
                     "device.html",
                     title=f"Device {device['id']}",
@@ -355,27 +453,34 @@ def register_routes(app):
                             flash(
                                 f"Aksi '{action}' pada {device['id']}/{interface} berhasil.", "success")
                         log_activity(device_id, "INFO", action, f"{action} {interface} → {value or '-'}", user=session.get("web_username"))
+                        _invalidate_cached_iface(device_id)
                         connected = True
                     except (automation.ConnectionError, ActionError, ValueError) as exc:
                         error = str(exc)
                         log_activity(device_id, "ERROR", action or "connect", str(exc), user=session.get("web_username"))
 
-        # Ambil daftar interface (read-only) pake kredensial di cache atau yang diisi
+        # Ambil daftar interface — pakai cache 2 menit, SSH hanya kalau cache miss/expired
         username, password, secret = _get_device_credentials(device_id)
         if not error:
-            try:
-                interfaces, raw_output = get_interface_summary(
-                    device,
-                    username=username,
-                    password=password,
-                    secret=secret,
-                    host=connection["host"],
-                    port=connection["port"],
-                    device_type=connection["device_type"],
-                )
+            cached_ifaces, cached_raw = _get_cached_iface(device_id)
+            if cached_ifaces is not None:
+                interfaces, raw_output = cached_ifaces, cached_raw
                 connected = True
-            except (automation.ConnectionError, ValueError) as exc:
-                error = str(exc)
+            else:
+                try:
+                    interfaces, raw_output = get_interface_summary(
+                        device,
+                        username=username,
+                        password=password,
+                        secret=secret,
+                        host=connection["host"],
+                        port=connection["port"],
+                        device_type=connection["device_type"],
+                    )
+                    _set_cached_iface(device_id, interfaces, raw_output)
+                    connected = True
+                except (automation.ConnectionError, ValueError) as exc:
+                    error = str(exc)
 
         cred_key = _cred_key(device_id)
         stored = session.get(cred_key, {})
@@ -493,26 +598,10 @@ def register_routes(app):
         parse_errors = []
         results = None
 
-        # Check real device connectivity secara paralel (threading) agar status di cards valid
-        default_username = current_app.config["LAB_DEVICE_USERNAME"]
-        default_password = current_app.config["LAB_DEVICE_PASSWORD"]
-        default_secret = current_app.config["LAB_DEVICE_SECRET"]
-
-        def _check(device):
-            if device.get("enabled"):
-                return device, check_device_reachable(
-                    device,
-                    username=default_username,
-                    password=default_password,
-                    secret=default_secret,
-                )
-            return device, "offline"
-
-        with ThreadPoolExecutor(max_workers=len(inventory) or 1) as pool:
-            futures = {pool.submit(_check, d): d for d in inventory}
-            for future in as_completed(futures):
-                dev, status = future.result()
-                dev["status"] = status
+        # Ambil status dari cache (direfresh background setiap 2 menit — tidak blocking)
+        statuses = _get_device_statuses(inventory)
+        for device in inventory:
+            device["status"] = statuses.get(str(device["id"]), "unknown")
 
         if request.method == "POST":
             # Batch pake kredensial global session (admin set sekali dari modal seting di Dashboard)
@@ -697,36 +786,36 @@ def register_routes(app):
 
     # ── TERMINAL ─────────────────────────────────────────────
 
-    def _get_terminal_session():
-        device_id = session.get("terminal_device_id")
-        if not device_id:
+    def _get_terminal_shell_id() -> str | None:
+        shell_id = session.get("terminal_shell_id")
+        if not shell_id:
             return None
-        return {
-            "device_id": device_id,
-            "username": session.get("terminal_username", ""),
-            "password": session.get("terminal_password", ""),
-            "secret": session.get("terminal_secret", "") or None,
-        }
+        with _shell_sessions_lock:
+            exists = shell_id in _shell_sessions
+        return shell_id if exists else None
 
     @app.route("/terminal")
     @login_required
     def terminal_page():
         inventory = load_inventory(_get_inventory_path())["devices"]
-        sess = _get_terminal_session()
+        shell_id = _get_terminal_shell_id()
         terminal_device = None
-        if sess:
+        if shell_id:
+            device_id = session.get("terminal_device_id")
             try:
-                terminal_device = find_device(inventory, sess["device_id"])
+                terminal_device = find_device(inventory, device_id)
             except InventoryError:
-                for key in ("terminal_device_id", "terminal_username", "terminal_password", "terminal_secret"):
+                _close_shell(shell_id)
+                for key in ("terminal_device_id", "terminal_shell_id", "terminal_prompt"):
                     session.pop(key, None)
-                sess = None
+                shell_id = None
         return render_template(
             "terminal.html",
             title="CLI Terminal",
             inventory=inventory,
-            has_terminal_session=bool(sess),
+            has_terminal_session=bool(shell_id),
             terminal_device=terminal_device,
+            terminal_prompt=session.get("terminal_prompt", ""),
         )
 
     @app.route("/terminal/connect", methods=["POST"])
@@ -744,14 +833,24 @@ def register_routes(app):
             flash(str(exc), "error")
             return redirect(url_for("terminal_page"))
 
+        # Tutup session lama jika ada
+        old_shell = session.get("terminal_shell_id")
+        if old_shell:
+            _close_shell(old_shell)
+
         try:
-            conn = automation.connect_device(device, username, password, secret)
-            conn.disconnect()
+            conn = open_terminal_session(device, username, password, secret)
+            shell_id = str(uuid.uuid4())
+            with _shell_sessions_lock:
+                _shell_sessions[shell_id] = {"conn": conn, "device": device}
+            try:
+                prompt = conn.find_prompt()
+            except Exception:
+                prompt = device["name"] + "#"
             session["terminal_device_id"] = device_id
-            session["terminal_username"] = username
-            session["terminal_password"] = password
-            session["terminal_secret"] = secret or ""
-            log_activity(device_id, "INFO", "terminal_connect", f"Connected via web terminal", user=session.get("web_username"))
+            session["terminal_shell_id"] = shell_id
+            session["terminal_prompt"] = prompt
+            log_activity(device_id, "INFO", "terminal_connect", "Connected via web terminal", user=session.get("web_username"))
             flash(f"Terhubung ke {device['name']}.", "success")
         except automation.ConnectionError as exc:
             log_activity(device_id, "ERROR", "terminal_connect", str(exc), user=session.get("web_username"))
@@ -762,32 +861,42 @@ def register_routes(app):
     @app.route("/terminal/execute", methods=["POST"])
     @login_required
     def terminal_execute():
-        sess = _get_terminal_session()
-        if not sess:
-            return jsonify({"ok": False, "error": "Belum terhubung ke perangkat."})
+        shell_id = _get_terminal_shell_id()
+        if not shell_id:
+            return jsonify({"ok": False, "error": "Belum terhubung ke perangkat. Silakan connect ulang."})
 
         data = request.get_json(silent=True) or {}
         command = data.get("command", "").strip()
         if not command:
             return jsonify({"ok": False, "error": "Command tidak boleh kosong."})
 
-        inventory = load_inventory(_get_inventory_path())["devices"]
-        try:
-            device = find_device(inventory, sess["device_id"])
-        except InventoryError:
-            return jsonify({"ok": False, "error": "Device tidak ditemukan di inventory."})
+        with _shell_sessions_lock:
+            shell_data = _shell_sessions.get(shell_id)
+        if not shell_data:
+            return jsonify({"ok": False, "error": "Sesi terminal tidak ditemukan."})
+
+        conn = shell_data["conn"]
+        if not conn.is_alive():
+            _close_shell(shell_id)
+            session.pop("terminal_shell_id", None)
+            return jsonify({"ok": False, "error": "Koneksi SSH terputus. Silakan connect ulang."})
 
         try:
-            output = execute_terminal_command(device, sess["username"], sess["password"], command, sess["secret"])
-            log_activity(sess["device_id"], "INFO", "terminal_cmd", command[:120], user=session.get("web_username"))
-            return jsonify({"ok": True, "output": output, "command": command})
+            output, prompt = terminal_send(conn, command)
+            if prompt:
+                session["terminal_prompt"] = prompt
+            log_activity(session.get("terminal_device_id", ""), "INFO", "terminal_cmd", command[:120], user=session.get("web_username"))
+            return jsonify({"ok": True, "output": output, "prompt": prompt, "command": command})
         except (ActionError, automation.ConnectionError) as exc:
             return jsonify({"ok": False, "error": str(exc)})
 
     @app.route("/terminal/disconnect", methods=["POST"])
     @login_required
     def terminal_disconnect():
-        for key in ("terminal_device_id", "terminal_username", "terminal_password", "terminal_secret"):
+        shell_id = session.get("terminal_shell_id")
+        if shell_id:
+            _close_shell(shell_id)
+        for key in ("terminal_device_id", "terminal_shell_id", "terminal_prompt"):
             session.pop(key, None)
         flash("Berhasil disconnect dari terminal.", "success")
         return redirect(url_for("terminal_page"))

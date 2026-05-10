@@ -6,6 +6,7 @@ import os
 import secrets
 from pathlib import Path
 
+from dotenv import load_dotenv, set_key
 from flask import Flask, flash, redirect, request, session, url_for
 from flask_talisman import Talisman
 from flask_wtf.csrf import CSRFError
@@ -16,37 +17,43 @@ from .routes import register_routes
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = PACKAGE_DIR.parent
+ENV_PATH = PROJECT_DIR / ".env"
 
 log = logging.getLogger(__name__)
 
 
-def _resolve_secret_key() -> str:
-    """Resolve app secret key from env or local fallback file for dev usage."""
-    env_key = os.environ.get("FLASK_SECRET_KEY", "").strip()
-    if env_key:
-        return env_key
-
-    key_file = PROJECT_DIR / ".secret_key"
-    if key_file.exists():
-        file_key = key_file.read_text(encoding="utf-8").strip()
-        if file_key:
-            log.warning(
-                "FLASK_SECRET_KEY belum di-set; memakai fallback dari .secret_key lokal. "
-                "Set FLASK_SECRET_KEY untuk produksi."
+def _ensure_env_file() -> None:
+    """Buat .env dari .env.example jika belum ada, lalu load ke os.environ."""
+    if not ENV_PATH.exists():
+        example = PROJECT_DIR / ".env.example"
+        if example.exists():
+            ENV_PATH.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+            log.info(".env dibuat dari .env.example")
+        else:
+            # Buat minimal .env kalau .env.example juga tidak ada
+            ENV_PATH.write_text(
+                "FLASK_SECRET_KEY=\n"
+                "WEB_USERNAME=admin\n"
+                "WEB_PASSWORD=admin\n"
+                "LAB_DEVICE_USERNAME=admin\n"
+                "LAB_DEVICE_PASSWORD=admin\n"
+                "LAB_DEVICE_SECRET=\n",
+                encoding="utf-8",
             )
-            return file_key
+            log.info(".env dibuat dengan nilai default")
 
-    # Generate once and persist so session tetap stabil antar restart di mesin lokal.
-    generated_key = secrets.token_hex(32)
-    key_file.write_text(generated_key, encoding="utf-8")
-    log.warning(
-        "FLASK_SECRET_KEY belum di-set; membuat .secret_key lokal untuk development. "
-        "Set FLASK_SECRET_KEY untuk produksi."
-    )
-    return generated_key
+    # Pastikan FLASK_SECRET_KEY terisi — generate sekali lalu tulis ke .env
+    load_dotenv(ENV_PATH, override=True)
+    if not os.environ.get("FLASK_SECRET_KEY", "").strip():
+        generated = secrets.token_hex(32)
+        set_key(str(ENV_PATH), "FLASK_SECRET_KEY", generated)
+        os.environ["FLASK_SECRET_KEY"] = generated
+        log.info("FLASK_SECRET_KEY di-generate dan disimpan ke .env")
 
 
 def create_app(test_config: dict | None = None) -> Flask:
+    _ensure_env_file()
+
     app = Flask(
         __name__,
         template_folder=str(PROJECT_DIR / "templates"),
@@ -54,7 +61,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     )
 
     # ── Secret Key ────────────────────────────────────────────
-    secret_key = _resolve_secret_key()
+    secret_key = os.environ["FLASK_SECRET_KEY"]
 
     # ── Cek kredensial default ────────────────────────────────
     web_user = os.environ.get("WEB_USERNAME", "admin")

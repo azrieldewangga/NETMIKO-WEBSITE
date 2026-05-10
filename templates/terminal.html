@@ -147,7 +147,7 @@
       </div>
 
       <div class="term-input-bar">
-        <span class="term-prompt">$</span>
+        <span class="term-prompt" id="termPrompt">{{ terminal_prompt or '$' }}</span>
         <input type="text" id="termInput" class="term-input"
           placeholder="{{ 'Ketik perintah Cisco IOS...' if has_terminal_session else 'Hubungkan dulu ke perangkat...' }}"
           {% if not has_terminal_session %}disabled{% endif %}
@@ -167,8 +167,8 @@
 {% block scripts %}
 <script>
   var cmdHistory = [], historyIdx = -1;
+  var currentPrompt = '{{ terminal_prompt or "$" }}';
 
-  /* Bug fix: null check agar tidak crash kalau meta tag CSRF tidak ada */
   var _csrfMeta = document.querySelector('meta[name="csrf-token"]');
   var CSRF_TOKEN = _csrfMeta ? _csrfMeta.getAttribute('content') : '';
 
@@ -180,6 +180,13 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function updatePrompt(p) {
+    if (!p) return;
+    currentPrompt = p;
+    var el = document.getElementById('termPrompt');
+    if (el) el.textContent = p;
+  }
+
   function appendToTerminal(text, type) {
     var out = document.getElementById('terminalOutput');
     var div = document.createElement('div');
@@ -189,11 +196,9 @@
     out.scrollTop = out.scrollHeight;
   }
 
-  /* Bug fix: clearTerminal hanya hapus output, bukan banner "Terhubung ke..." */
   function clearTerminal() {
     var out = document.getElementById('terminalOutput');
-    var toRemove = out.querySelectorAll('.term-cmd, .term-output, .term-error');
-    toRemove.forEach(function(el) { el.remove(); });
+    out.querySelectorAll('.term-cmd, .term-output, .term-error, .term-noout').forEach(function(el) { el.remove(); });
   }
 
   function saveHistory() {
@@ -208,7 +213,6 @@
     historyIdx = cmdHistory.length;
   }
 
-  /* Bug fix: pisahkan JSON.stringify(cmd) untuk onclick dari escapeHtml(cmd) untuk display */
   function updateHistoryPanel() {
     var panel = document.getElementById('historyList');
     if (!panel) return;
@@ -223,10 +227,7 @@
 
   function fillCommand(cmd) {
     var input = document.getElementById('termInput');
-    if (input && !input.disabled) {
-      input.value = cmd;
-      input.focus();
-    }
+    if (input && !input.disabled) { input.value = cmd; input.focus(); }
   }
 
   function sendCommand() {
@@ -234,7 +235,7 @@
     var cmd = input.value.trim();
     if (!cmd) return;
 
-    appendToTerminal('$ ' + cmd, 'cmd');
+    appendToTerminal(currentPrompt + ' ' + cmd, 'cmd');
     cmdHistory.push(cmd);
     historyIdx = cmdHistory.length;
     saveHistory();
@@ -250,10 +251,19 @@
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
       body: JSON.stringify({ command: cmd })
     })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then(function(data) {
+      if (data.prompt) updatePrompt(data.prompt);
       if (data.ok) {
-        appendToTerminal(data.output || '(no output)', 'output');
+        if (data.output) {
+          appendToTerminal(data.output, 'output');
+        } else {
+          /* Command berhasil tapi tidak ada output (conf t, ip address, dll) */
+          appendToTerminal('(ok)', 'noout');
+        }
       } else {
         appendToTerminal('Error: ' + data.error, 'error');
       }
@@ -269,7 +279,6 @@
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    /* Bug fix: load history dari sessionStorage saat page load */
     loadHistory();
     updateHistoryPanel();
 

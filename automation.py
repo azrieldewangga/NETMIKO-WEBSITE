@@ -733,24 +733,54 @@ def get_activity_log(device_id: str, limit: int = 100) -> list[dict]:
         return []
 
 
-# ── Terminal Command Execution ────────────────────────────────────────────────
+# ── Terminal Shell Session (persistent, interactive) ─────────────────────────
 
-def execute_terminal_command(
+_TERMINAL_BLOCKED = re.compile(
+    r"^\s*(reload|erase\s+nvram[:\s]?|erase\s+startup|write\s+erase|format\s)\b",
+    re.IGNORECASE,
+)
+
+
+def open_terminal_session(
     device: dict[str, Any],
     username: str,
     password: str,
-    command: str,
     secret: str | None = None,
-) -> str:
-    """Eksekusi satu perintah di device via SSH, return raw output string."""
-    cleaned = sanitize_cli_value(command)
-    if not cleaned:
+) -> Any:
+    """Buka koneksi Netmiko persisten untuk sesi terminal interaktif."""
+    return connect_device(device, username, password, secret)
+
+
+def terminal_send(conn: Any, command: str) -> tuple[str, str]:
+    """
+    Kirim satu perintah ke koneksi Netmiko persisten.
+    Pakai send_command_timing agar command tanpa output (conf t, ip address, dll)
+    tidak timeout karena tidak menunggu prompt pattern.
+    Returns (output, current_prompt).
+    """
+    cmd = command.strip()
+    if not cmd:
         raise ActionError("Command tidak boleh kosong.")
-    connection = connect_device(device, username, password, secret)
+    if _TERMINAL_BLOCKED.match(cmd):
+        raise ActionError(f"Perintah '{cmd}' diblokir karena berbahaya.")
+
     try:
-        return connection.send_command(cleaned)
-    finally:
-        connection.disconnect()
+        output = conn.send_command_timing(
+            cmd,
+            delay_factor=2,
+            strip_prompt=True,
+            strip_command=True,
+        )
+        output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output).strip()
+    except Exception as exc:
+        raise ConnectionError(f"Gagal mengirim perintah: {exc}") from exc
+
+    try:
+        prompt = conn.find_prompt()
+    except Exception:
+        prompt = ""
+
+    return output, prompt
 
 
 # ── Enhanced Device Detail ────────────────────────────────────────────────────
