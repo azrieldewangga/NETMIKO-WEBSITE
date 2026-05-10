@@ -4,12 +4,14 @@ import json
 import logging
 import os
 import secrets
+import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv, set_key
 from flask import Flask, flash, redirect, request, session, url_for
 from flask_talisman import Talisman
 from flask_wtf.csrf import CSRFError
+from werkzeug.security import generate_password_hash
 
 from .extensions import csrf, limiter
 from .routes import register_routes
@@ -51,6 +53,42 @@ def _ensure_env_file() -> None:
         log.info("FLASK_SECRET_KEY di-generate dan disimpan ke .env")
 
 
+def _bootstrap_users(users_path: Path, web_user: str, web_pass: str) -> None:
+    """
+    Pastikan users.json selalu ada dan minimal punya satu super_admin.
+
+    Migrasi: jika users.json belum ada, buat akun super_admin pertama
+    dari kredensial WEB_USERNAME/WEB_PASSWORD yang sudah ada di .env / profile.json.
+    Ini menjamin login lama tetap berfungsi tanpa konfigurasi ulang.
+    """
+    if users_path.exists():
+        # Validasi: pastikan strukturnya ok
+        try:
+            data = json.loads(users_path.read_text(encoding="utf-8"))
+            if isinstance(data.get("users"), list):
+                return  # Sudah valid, tidak perlu apa-apa
+        except Exception:
+            pass
+
+    # Buat users.json dari scratch dengan satu akun super_admin
+    log.info("Membuat users.json — migrasi dari kredensial .env lama.")
+    initial_user = {
+        "id": str(uuid.uuid4()),
+        "username": web_user,
+        "password_hash": generate_password_hash(web_pass),
+        "role": "super_admin",
+        "display_name": web_user.capitalize(),
+        "avatar": None,
+        "created_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+        "active": True,
+    }
+    users_path.write_text(
+        json.dumps({"users": [initial_user]}, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    log.info("Akun super_admin '%s' berhasil dibuat di users.json.", web_user)
+
+
 def create_app(test_config: dict | None = None) -> Flask:
     _ensure_env_file()
 
@@ -63,11 +101,11 @@ def create_app(test_config: dict | None = None) -> Flask:
     # ── Secret Key ────────────────────────────────────────────
     secret_key = os.environ["FLASK_SECRET_KEY"]
 
-    # ── Cek kredensial default ────────────────────────────────
+    # ── Baca kredensial lama (untuk migrasi ke users.json) ───
     web_user = os.environ.get("WEB_USERNAME", "admin")
     web_pass = os.environ.get("WEB_PASSWORD", "admin")
 
-    # Override dengan profile.json jika ada
+    # Override dengan profile.json jika ada (backward compat)
     profile_path = PROJECT_DIR / "profile.json"
     if profile_path.exists():
         try:
@@ -82,7 +120,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     if web_user == "admin" and web_pass == "admin":
         log.warning(
             "WEB_USERNAME/WEB_PASSWORD masih default (admin/admin). "
-            "Ganti segera untuk keamanan!"
+            "Ganti segera melalui User Management!"
         )
 
     device_user = os.environ.get("LAB_DEVICE_USERNAME", "admin")
@@ -93,9 +131,12 @@ def create_app(test_config: dict | None = None) -> Flask:
             "Ganti segera untuk keamanan!"
         )
 
+    users_path = PROJECT_DIR / "users.json"
+
     app.config.from_mapping(
         SECRET_KEY=secret_key,
         WTF_CSRF_ENABLED=True,
+        # Credentials lama masih disimpan di config untuk background scan
         WEB_USERNAME=web_user,
         WEB_PASSWORD=web_pass,
         LAB_DEVICE_USERNAME=device_user,
@@ -103,10 +144,14 @@ def create_app(test_config: dict | None = None) -> Flask:
         LAB_DEVICE_SECRET=os.environ.get("LAB_DEVICE_SECRET", ""),
         INVENTORY_PATH=str(PROJECT_DIR / "inventory.json"),
         PROFILE_PATH=str(PROJECT_DIR / "profile.json"),
+        USERS_PATH=str(users_path),
         UPLOAD_FOLDER=str(PROJECT_DIR / "static" / "uploads"),
     )
     if test_config:
         app.config.update(test_config)
+
+    # ── Bootstrap users.json (migrasi otomatis) ───────────────
+    _bootstrap_users(users_path, web_user, web_pass)
 
     # ── Extensions ────────────────────────────────────────────
     csrf.init_app(app)
