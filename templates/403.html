@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;gap:16px;">
+  <div style="font-size:72px;font-weight:700;color:var(--accent);opacity:.2;">403</div>
+  <h1 style="font-size:22px;font-weight:700;margin:0;">Akses Ditolak</h1>
+  <p class="muted" style="max-width:360px;">Role Anda tidak memiliki izin untuk mengakses halaman ini. Hubungi Super Admin jika Anda memerlukan akses.</p>
+  <a href="{{ url_for('dashboard') }}" class="btn" style="margin-top:8px;">← Kembali ke Dashboard</a>
+</div>
+{% endblock %}

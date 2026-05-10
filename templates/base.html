@@ -38,7 +38,17 @@
     <span class="topbar-brand-name">NetPanel</span>
     <span class="topbar-brand-chevron">&#8964;</span>
   </div>
-  <div class="topbar-right">
+  <div class="topbar-right" style="display:flex;align-items:center;gap:12px;">
+    <div style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;">
+      <span style="font-size:12px;font-weight:600;color:var(--text);">{{ current_display_name or session.get('web_username','') }}</span>
+      {% if current_role == 'super_admin' %}
+      <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:#a855f7;text-transform:uppercase;">Super Admin</span>
+      {% elif current_role == 'admin' %}
+      <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:#3b82f6;text-transform:uppercase;">Admin</span>
+      {% else %}
+      <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:#22c55e;text-transform:uppercase;">User</span>
+      {% endif %}
+    </div>
     <a href="{{ url_for('profile') }}" class="topbar-avatar" title="Profile"
       style="text-decoration:none; overflow:hidden;">
       {% if topbar_avatar %}
@@ -108,6 +118,23 @@
       </svg>
       CLI Terminal
     </a>
+
+    {% if current_role == 'admin' or current_role == 'super_admin' %}
+    <div class="nav-label" style="margin-top:8px;">Manajemen</div>
+    {% endif %}
+
+    {% if current_role == 'super_admin' %}
+    <a href="{{ url_for('admin_users') }}"
+       class="nav-item {% if request.endpoint == 'admin_users' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      User Management
+    </a>
+    {% endif %}
 
     {% block sidebar_extras %}{% endblock %}
   </nav>

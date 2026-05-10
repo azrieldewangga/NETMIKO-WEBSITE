@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('dashboard') }}">Overview</a>
+  <span class="breadcrumb-sep">/</span>
+  <span class="breadcrumb-cur">User Management</span>
+</div>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">User Management</h1>
+    <p class="page-subtitle">Kelola akun karyawan dan level akses ke sistem NetPanel.</p>
+  </div>
+  <button onclick="openCreateModal()" id="btn-create-user" style="display:flex;align-items:center;gap:8px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Tambah User
+  </button>
+</div>
+
+<!-- Permission Matrix Info -->
+<div class="card" style="margin-bottom:20px;padding:16px 20px;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span style="font-size:12px;font-weight:600;color:var(--text);">Permission Matrix</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+    <div style="padding:12px;border-radius:8px;background:var(--surface2);border:1px solid #a855f722;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:#a855f7;display:inline-block;"></span>
+        <span style="font-weight:700;font-size:12px;color:#a855f7;">Super Admin</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:0;">Akses penuh — kelola user, device, automation, terminal, batch.</p>
+    </div>
+    <div style="padding:12px;border-radius:8px;background:var(--surface2);border:1px solid #3b82f622;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>
+        <span style="font-weight:700;font-size:12px;color:#3b82f6;">Admin</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:0;">Eksekusi automation & CLI terminal. Tidak bisa kelola user lain.</p>
+    </div>
+    <div style="padding:12px;border-radius:8px;background:var(--surface2);border:1px solid #22c55e22;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+        <span style="font-weight:700;font-size:12px;color:#22c55e;">User</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:0;">Hanya lihat dashboard & info device. Tidak bisa eksekusi aksi.</p>
+    </div>
+  </div>
+</div>
+
+<!-- User Table -->
+<div class="card" style="padding:0;overflow:hidden;">
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border);">
+        <th style="padding:12px 20px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">User</th>
+        <th style="padding:12px 20px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Role</th>
+        <th style="padding:12px 20px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Status</th>
+        <th style="padding:12px 20px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Dibuat</th>
+        <th style="padding:12px 20px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      {% set is_self = (u.id == session.get('user_id')) %}
+      <tr class="tbl-row" style="border-bottom:1px solid var(--border);">
+        <td style="padding:14px 20px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;border:1px solid var(--border);">
+              {% if u.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' + u.avatar) }}" style="width:100%;height:100%;object-fit:cover;" alt="">
+              {% else %}
+              <span style="font-size:14px;font-weight:700;color:var(--muted);">{{ u.username[0].upper() }}</span>
+              {% endif %}
+            </div>
+            <div>
+              <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;">
+                {{ u.display_name or u.username }}
+                {% if is_self %}<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:rgba(99,102,241,0.15);color:var(--accent);font-weight:700;">Anda</span>{% endif %}
+              </div>
+              <div style="font-size:11px;color:var(--muted);">@{{ u.username }}</div>
+            </div>
+          </div>
+        </td>
+        <td style="padding:14px 20px;">
+          {% if u.role == 'super_admin' %}
+          <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.25);">Super Admin</span>
+          {% elif u.role == 'admin' %}
+          <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.25);">Admin</span>
+          {% else %}
+          <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.25);">User</span>
+          {% endif %}
+        </td>
+        <td style="padding:14px 20px;">
+          {% if u.active != False %}
+          <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#22c55e;font-weight:600;">
+            <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;"></span>Aktif
+          </span>
+          {% else %}
+          <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block;"></span>Nonaktif
+          </span>
+          {% endif %}
+        </td>
+        <td style="padding:14px 20px;font-size:12px;color:var(--muted);">
+          {% if u.created_at %}{{ u.created_at[:10] }}{% else %}–{% endif %}
+        </td>
+        <td style="padding:14px 20px;text-align:right;">
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;">
+            <button class="secondary" style="padding:5px 12px;font-size:12px;"
+              onclick='openEditModal({{ u|tojson }})'>Edit</button>
+            {% if not is_self %}
+            <form method="post" action="{{ url_for('admin_users_delete', user_id=u.id) }}"
+              data-name="{{ (u.display_name or u.username)|e }}"
+              onsubmit="return confirmDelete(this.dataset.name)">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" style="padding:5px 12px;font-size:12px;background:rgba(192,23,23,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.2);">Hapus</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="padding:40px;text-align:center;color:var(--muted);">Belum ada user.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal: Tambah User -->
+<div id="createModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:460px;width:100%;">
+    <div class="modal-header">
+      <h3>Tambah User Baru</h3>
+      <button class="modal-close" onclick="closeCreateModal()">&#10005;</button>
+    </div>
+    <form method="post" action="{{ url_for('admin_users_create') }}" id="formCreate">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label for="c_display_name">Nama Tampil</label>
+        <input id="c_display_name" name="display_name" placeholder="Nama lengkap atau panggilan" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="c_username">Username <span style="color:#ef4444">*</span></label>
+        <input id="c_username" name="username" placeholder="username" required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="c_password">Password <span style="color:#ef4444">*</span></label>
+        <input id="c_password" name="password" type="password" placeholder="Min. 6 karakter" required autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label for="c_role">Role / Level Akses <span style="color:#ef4444">*</span></label>
+        <select id="c_role" name="role" required style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;">
+          <option value="user">User — Hanya lihat dashboard & info</option>
+          <option value="admin">Admin — Eksekusi automation & CLI</option>
+          <option value="super_admin">Super Admin — Akses penuh</option>
+        </select>
+      </div>
+      <div class="actions actions-end" style="margin-top:20px;">
+        <button type="button" class="secondary" onclick="closeCreateModal()">Batal</button>
+        <button type="submit">Buat User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Edit User -->
+<div id="editModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:460px;width:100%;">
+    <div class="modal-header">
+      <h3>Edit User</h3>
+      <button class="modal-close" onclick="closeEditModal()">&#10005;</button>
+    </div>
+    <form method="post" id="formEdit" action="">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label for="e_display_name">Nama Tampil</label>
+        <input id="e_display_name" name="display_name" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="e_username">Username</label>
+        <input id="e_username" name="username" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="e_password">Password Baru <span style="font-size:11px;color:var(--muted);">(kosongkan jika tidak diubah)</span></label>
+        <input id="e_password" name="password" type="password" placeholder="Password baru..." autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label for="e_role">Role / Level Akses</label>
+        <select id="e_role" name="role" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;">
+          <option value="user">User — Hanya lihat dashboard & info</option>
+          <option value="admin">Admin — Eksekusi automation & CLI</option>
+          <option value="super_admin">Super Admin — Akses penuh</option>
+        </select>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="e_active" name="active" value="1" style="width:16px;height:16px;accent-color:var(--accent);">
+        <label for="e_active" style="margin:0;cursor:pointer;">Akun Aktif</label>
+      </div>
+      <div class="actions actions-end" style="margin-top:20px;">
+        <button type="button" class="secondary" onclick="closeEditModal()">Batal</button>
+        <button type="submit">Simpan Perubahan</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .tbl-row { transition: background 0.15s; }
+  .tbl-row:hover { background: var(--surface2); }
+</style>
+<script>
+  var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+  var BASE_EDIT_URL = "{{ url_for('admin_users_edit', user_id='__ID__') }}";
+
+  function openCreateModal() {
+    document.getElementById('createModal').style.display = 'flex';
+    document.getElementById('c_username').focus();
+  }
+  function closeCreateModal() {
+    document.getElementById('createModal').style.display = 'none';
+    document.getElementById('formCreate').reset();
+  }
+
+  function openEditModal(user) {
+    var url = BASE_EDIT_URL.replace('__ID__', user.id);
+    document.getElementById('formEdit').action = url;
+    document.getElementById('e_display_name').value = user.display_name || '';
+    document.getElementById('e_username').value = user.username || '';
+    document.getElementById('e_password').value = '';
+    document.getElementById('e_role').value = user.role || 'user';
+    document.getElementById('e_active').checked = user.active !== false;
+    document.getElementById('editModal').style.display = 'flex';
+    document.getElementById('e_display_name').focus();
+  }
+  function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+  }
+
+  function confirmDelete(name) {
+    return confirm('Hapus user "' + name + '"?\nAksi ini tidak bisa dibatalkan.');
+  }
+
+  // Tutup modal saat klik backdrop
+  document.getElementById('createModal').addEventListener('click', function(e) {
+    if (e.target === this) closeCreateModal();
+  });
+  document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+  });
+</script>
+{% endblock %}

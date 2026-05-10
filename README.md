@@ -113,8 +113,6 @@ Device dikelola di `inventory.json`. Tambahkan device baru dengan format:
 | `role` | Label peran: `router`, `switch`, dll. |
 | `enabled` | `true`/`false` — apakah muncul di dashboard |
 
-> ⚠️ **Auto-discovery TIDAK tersedia.** Device baru harus ditambahkan secara manual ke `inventory.json` agar muncul di dashboard.
-
 ---
 
 ##  Alur Kerja Aplikasi
