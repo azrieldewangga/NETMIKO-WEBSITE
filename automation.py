@@ -801,13 +801,19 @@ def _parse_show_version(output: str) -> dict:
 
 
 def _parse_route_count(output: str) -> int:
-    """Ambil total route count dari output show ip route summary."""
-    for line in output.splitlines():
-        if "Total" in line:
-            parts = line.split()
-            for part in reversed(parts):
-                if part.isdigit():
-                    return int(part)
+    """Ambil total route count dari output 'show ip route summary'.
+
+    Format output Cisco iOS:
+        Route Source    Networks    Subnets     Replicating   Total Route Entry    Total Routes
+        ...
+        Total            0            2            0              0                  2
+
+    Parsing dengan regex untuk ambil nilai dari kolom 'Total Routes' (terakhir).
+    """
+    m = re.search(r"^\s*Total\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$", output, re.MULTILINE)
+    if m:
+        # Groups: Networks, Subnets, Replicating, Total Route Entry, Total Routes
+        return int(m.group(5))  # Total Routes adalah grup terakhir
     return 0
 
 
