@@ -57,6 +57,7 @@ NETMIKO_EXCEPTIONS = (
     ReadTimeout,
     socket.error,
     OSError,
+    EOFError,
 )
 
 # ── Bantuan Keamanan ──────────────────────────────────────────────────────────
@@ -328,7 +329,7 @@ def build_connection_params(
         "port": int(port or device["port"]),
         "username": username,
         "password": password,
-        "fast_cli": True,
+        "fast_cli": False,
     }
     if log_session:
         device_id = device.get("id", "unknown")
