@@ -801,29 +801,33 @@ def _parse_show_version(output: str) -> dict:
 
 
 def _parse_route_count(output: str) -> int:
-    """Ambil total route count dari output 'show ip route summary'.
+    """Ambil total route count dari output 'show ip route summary' dengan multiple fallback."""
+    if not output or not output.strip():
+        return 0
 
-    Format output Cisco iOS:
-        Route Source    Networks    Subnets     Replicating   Total Route Entry    Total Routes
-        ...
-        Total            0            2            0              0                  2
-
-    Parsing dengan regex strict, fallback ke loose parsing jika tidak match.
-    """
-    # Parsing strict: cari baris "Total" dengan 5 angka (format standard)
+    # Approach 1: Strict regex untuk format standard Cisco
+    # Total            0            2            0              0                  2
     m = re.search(r"^\s*Total\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$", output, re.MULTILINE)
     if m:
         return int(m.group(5))
 
-    # Fallback: cari baris dengan "Total" dan ambil angka terakhir
+    # Approach 2: Flexible regex - "Total" + angka-angka
+    m = re.search(r"^\s*Total\s+(.*?)$", output, re.MULTILINE | re.IGNORECASE)
+    if m:
+        parts = m.group(1).split()
+        for part in reversed(parts):
+            if part.isdigit():
+                return int(part)
+
+    # Approach 3: Count manual dari routes yang listed
+    # Jika show ip route summary tidak match, count baris dengan "is" (route entries)
+    count = 0
     for line in output.splitlines():
-        stripped = line.strip()
-        if stripped.lower().startswith("total"):
-            parts = stripped.split()
-            # Filter hanya angka dari belakang
-            for part in reversed(parts):
-                if part.isdigit():
-                    return int(part)
+        if " is " in line and re.search(r"\b(connected|static|ospf|bgp|rip|eigrp|isis)\b", line, re.IGNORECASE):
+            count += 1
+    if count > 0:
+        return count
+
     return 0
 
 
