@@ -808,12 +808,22 @@ def _parse_route_count(output: str) -> int:
         ...
         Total            0            2            0              0                  2
 
-    Parsing dengan regex untuk ambil nilai dari kolom 'Total Routes' (terakhir).
+    Parsing dengan regex strict, fallback ke loose parsing jika tidak match.
     """
+    # Parsing strict: cari baris "Total" dengan 5 angka (format standard)
     m = re.search(r"^\s*Total\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$", output, re.MULTILINE)
     if m:
-        # Groups: Networks, Subnets, Replicating, Total Route Entry, Total Routes
-        return int(m.group(5))  # Total Routes adalah grup terakhir
+        return int(m.group(5))
+
+    # Fallback: cari baris dengan "Total" dan ambil angka terakhir
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("total"):
+            parts = stripped.split()
+            # Filter hanya angka dari belakang
+            for part in reversed(parts):
+                if part.isdigit():
+                    return int(part)
     return 0
 
 
@@ -864,8 +874,14 @@ def get_device_detail(
         try:
             route_out = connection.send_command("show ip route summary")
             result["route_count"] = _parse_route_count(route_out)
-        except Exception:
+            # Debug: log raw output jika parsing hasil 0 (untuk troubleshooting)
+            if result["route_count"] == 0 and route_out.strip():
+                import sys
+                print(f"DEBUG: route_out parsing result 0 for {device['id']}:\n{route_out[:500]}", file=sys.stderr)
+        except Exception as exc:
             result["route_count"] = 0
+            import sys
+            print(f"DEBUG: Exception on show ip route summary for {device['id']}: {exc}", file=sys.stderr)
 
     except ConnectionError as exc:
         result["error"] = str(exc)
