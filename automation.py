@@ -801,26 +801,30 @@ def _parse_show_version(output: str) -> dict:
 
 
 def _parse_route_count(output: str) -> int:
-    """Ambil total route count dari output 'show ip route summary' dengan multiple fallback."""
+    """Ambil total route count dari output 'show ip route summary'.
+
+    Support multiple output formats:
+    1. Standard format: Total + 5 columns (Networks, Subnets, Replicating, Total Route Entry, Total Routes)
+    2. Alternate format: Total + 4 columns (Networks, Subnets, Overhead, Memory)
+    3. Fallback: Sum Networks dari semua route sources
+    """
     if not output or not output.strip():
         return 0
 
-    # Approach 1: Strict regex untuk format standard Cisco
-    # Total            0            2            0              0                  2
+    # Approach 1: Format standard 5-column (ambil kolom ke-5: Total Routes)
     m = re.search(r"^\s*Total\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$", output, re.MULTILINE)
     if m:
         return int(m.group(5))
 
-    # Approach 2: Flexible regex - "Total" + angka-angka
-    m = re.search(r"^\s*Total\s+(.*?)$", output, re.MULTILINE | re.IGNORECASE)
+    # Approach 2: Format alternate 4-column dengan Networks sebagai total (ambil kolom ke-1)
+    # Route Source    Networks    Subnets     Overhead   Memory (bytes)
+    # Total             3            0           216        408
+    m = re.search(r"^\s*Total\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$", output, re.MULTILINE)
     if m:
-        parts = m.group(1).split()
-        for part in reversed(parts):
-            if part.isdigit():
-                return int(part)
+        # Ambil kolom pertama (Networks) sebagai total route count
+        return int(m.group(1))
 
     # Approach 3: Count manual dari routes yang listed
-    # Jika show ip route summary tidak match, count baris dengan "is" (route entries)
     count = 0
     for line in output.splitlines():
         if " is " in line and re.search(r"\b(connected|static|ospf|bgp|rip|eigrp|isis)\b", line, re.IGNORECASE):
