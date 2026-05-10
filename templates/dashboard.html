@@ -24,6 +24,14 @@
   </div>
 </div>
 
+<!-- Banner status background network scan -->
+<div id="scanStatusBanner" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:10px 16px; margin-bottom:14px; display:flex; align-items:center; gap:10px; font-size:13px;">
+  <span id="scanBannerIcon" style="flex-shrink:0;"></span>
+  <span id="scanBannerText" style="flex:1;"></span>
+  <button type="button" id="scanBannerReload" onclick="location.reload()" style="display:none;font-size:12px;padding:4px 12px;">Reload Topology</button>
+  <button type="button" id="scanBannerDismiss" onclick="document.getElementById('scanStatusBanner').style.display='none'" style="font-size:12px;padding:4px 10px;background:none;border:none;cursor:pointer;color:var(--muted);">&#10005;</button>
+</div>
+
 <!-- Stats bar: ringkasan singkat total device, device online, dan jumlah tipe device -->
 <div class="stats-bar">
   <div class="stat-card">
@@ -516,6 +524,59 @@
 
 {% block scripts %}
 <script>
+  /* ── Background Scan Status Polling ── */
+  var _scanPollInterval = null;
+  var _scanBannerShown = false;
+
+  function _showScanBanner(running, result) {
+    var banner   = document.getElementById("scanStatusBanner");
+    var icon     = document.getElementById("scanBannerIcon");
+    var text     = document.getElementById("scanBannerText");
+    var reload   = document.getElementById("scanBannerReload");
+
+    banner.style.display = "flex";
+    _scanBannerShown = true;
+
+    if (running) {
+      icon.innerHTML = '<div style="width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>';
+      text.textContent = "Scanning network... mencari router aktif di semua subnet lokal.";
+      banner.style.borderColor = "var(--accent)";
+      reload.style.display = "none";
+    } else if (result) {
+      var found = (result.found || []).length;
+      var subnets = (result.subnets_scanned || []).join(", ") || "—";
+      var errors = (result.errors || []).length;
+      if (found > 0) {
+        icon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        text.innerHTML = '<strong style="color:var(--success);">Scan selesai:</strong> Ditemukan <strong>' + found + '</strong> device (' + result.found.join(", ") + '). Subnet: <code style="font-size:11px;">' + subnets + '</code>';
+        banner.style.borderColor = "var(--success-border)";
+        reload.style.display = "";
+      } else {
+        icon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        text.innerHTML = '<span style="color:var(--muted);">Scan selesai: tidak ada device SSH ditemukan.</span>' + (errors > 0 ? ' (' + errors + ' error)' : '') + ' Subnet: <code style="font-size:11px;">' + subnets + '</code>';
+        banner.style.borderColor = "var(--border)";
+        reload.style.display = "none";
+      }
+    }
+  }
+
+  function _pollScanStatus() {
+    fetch("{{ url_for('api_scan_status') }}")
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.running) {
+          _showScanBanner(true, null);
+        } else {
+          clearInterval(_scanPollInterval);
+          _scanPollInterval = null;
+          if (data.result || _scanBannerShown) {
+            _showScanBanner(false, data.result);
+          }
+        }
+      })
+      .catch(function() { clearInterval(_scanPollInterval); _scanPollInterval = null; });
+  }
+
   /* ── Scan Network ── */
   function startScanNetwork() {
     document.getElementById("scanModal").style.display = "flex";
@@ -595,6 +656,19 @@
     if (scanOverlay) scanOverlay.addEventListener("click", function(e) {
       if (e.target === scanOverlay) closeScanModal();
     });
+
+    /* Poll status background scan yang dijalankan saat login */
+    fetch("{{ url_for('api_scan_status') }}")
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.running) {
+          _showScanBanner(true, null);
+          _scanPollInterval = setInterval(_pollScanStatus, 3000);
+        } else if (data.result) {
+          _showScanBanner(false, data.result);
+        }
+      })
+      .catch(function() {});
   });
 
   /* ── Search: filter device cards real-time berdasarkan nama/IP/role/id ── */

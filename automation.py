@@ -6,6 +6,7 @@ import re
 import socket
 import subprocess
 import threading
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -944,25 +945,184 @@ def try_ssh_discover(
         return None
 
 
-def parse_cdp_neighbors(cdp_output: str, device_id: str) -> list[dict]:
-    """Parse output 'show cdp neighbors detail' → list link {from, from_intf, to, to_intf}."""
-    links: list[dict] = []
+def parse_cdp_detail(cdp_output: str) -> list[dict]:
+    """
+    Parse 'show cdp neighbors detail' → list neighbor dengan IP, device_type, role, dan interface pair.
+    IP neighbor adalah kunci untuk BFS topology walk — tanpa IP, kita tidak bisa SSH ke neighbor berikutnya.
+    """
+    neighbors: list[dict] = []
     blocks = re.split(r"-{10,}", cdp_output)
+
     for block in blocks:
-        neighbor_m = re.search(r"Device ID:\s*(\S+)", block)
-        intf_m = re.search(r"Interface:\s*(\S+?),\s*Port ID[^\:]*:\s*(\S+)", block)
-        if not neighbor_m or not intf_m:
+        if not block.strip():
             continue
-        neighbor = re.sub(r"\.\S+$", "", neighbor_m.group(1).strip()).lower()
-        local_intf = intf_m.group(1).rstrip(",")
-        remote_intf = intf_m.group(2)
-        links.append({
-            "from": device_id,
-            "from_intf": local_intf,
-            "to": neighbor,
-            "to_intf": remote_intf,
+
+        # Hostname neighbor dari "Device ID:"
+        device_id_m = re.search(r"Device ID:\s*(\S+)", block)
+        if not device_id_m:
+            continue
+        raw_id = device_id_m.group(1).strip()
+        hostname = raw_id.split(".")[0].lower()  # strip domain suffix (R1.lab.com → r1)
+
+        # IP address neighbor — inilah yang dipakai SSH ke hop berikutnya di BFS
+        # CDP bisa tampilkan "IP address:" atau "IPv4 Address:"
+        ip_m = re.search(r"IP(?:v4)?\s+[Aa]ddress:\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", block)
+        neighbor_ip = ip_m.group(1) if ip_m else None
+
+        # Platform string — untuk infer device_type Netmiko
+        platform_m = re.search(r"Platform:\s*([^,\n]+)", block)
+        platform = platform_m.group(1).strip() if platform_m else ""
+        p_low = platform.lower()
+        if "nx-os" in p_low or "nexus" in p_low:
+            device_type = "cisco_nxos"
+        elif "ios xe" in p_low or "ios-xe" in p_low:
+            device_type = "cisco_xe"
+        elif "ios xr" in p_low:
+            device_type = "cisco_xr"
+        elif "asa" in p_low:
+            device_type = "cisco_asa"
+        else:
+            device_type = "cisco_ios"
+
+        # Capabilities → tentukan role (router vs switch)
+        cap_m = re.search(r"Capabilities:\s*(.+)", block)
+        capabilities = cap_m.group(1).strip() if cap_m else ""
+        role = "switch" if ("Switch" in capabilities and "Router" not in capabilities) else "router"
+
+        # Interface pair: local (port di device kita) dan remote (port di neighbor)
+        intf_m = re.search(r"Interface:\s*(\S+?),\s*Port ID[^:]*:\s*(\S+)", block)
+        local_intf = intf_m.group(1).rstrip(",") if intf_m else ""
+        remote_intf = intf_m.group(2) if intf_m else ""
+
+        neighbors.append({
+            "hostname": hostname,
+            "ip": neighbor_ip,
+            "platform": platform,
+            "device_type": device_type,
+            "role": role,
+            "local_intf": local_intf,
+            "remote_intf": remote_intf,
         })
-    return links
+
+    return neighbors
+
+
+def discover_topology(
+    seed_devices: list[dict[str, Any]],
+    username: str,
+    password: str,
+    secret: str | None = None,
+) -> dict:
+    """
+    BFS topology discovery mulai dari seed_devices (inventory yang sudah ada).
+
+    Alur:
+      1. SSH ke seed → find_prompt() → dapat hostname
+      2. show cdp neighbors detail → parse_cdp_detail() → dapat IP + info tiap neighbor
+      3. Queue IP neighbor yang belum dikunjungi → SSH ke sana → repeat
+      4. Sampai tidak ada IP baru yang ditemukan
+
+    Tidak perlu ping sweep — CDP memberikan IP tetangga secara eksplisit.
+    Bekerja selama router seed sudah bisa di-SSH dari web UI.
+    """
+    visited_ips: set[str] = set()
+    visited_ids: set[str] = set()
+    queue: deque[dict] = deque(seed_devices)
+
+    discovered: list[dict] = []
+    all_links: list[dict] = []
+    errors: list[str] = []
+
+    while queue:
+        seed = queue.popleft()
+        ip = (seed.get("host") or "").strip()
+        if not ip or ip in visited_ips:
+            continue
+        visited_ips.add(ip)
+
+        try:
+            params: dict[str, Any] = {
+                "device_type": seed.get("device_type", "cisco_ios"),
+                "host": ip,
+                "username": username,
+                "password": password,
+                "timeout": 10,
+                "banner_timeout": 10,
+                "auth_timeout": 10,
+                "fast_cli": True,
+            }
+            if secret:
+                params["secret"] = secret
+
+            conn = netmiko.ConnectHandler(**params)
+            try:
+                # Hostname dari prompt (misal "R1#" → "r1", "Router>" → "router")
+                prompt = conn.find_prompt()
+                hostname = re.sub(r"[>#\s].*$", "", prompt).strip().lower()
+                if not hostname:
+                    hostname = ip.replace(".", "_")
+
+                # CDP neighbors detail — kunci BFS: tiap neighbor ada IP-nya
+                cdp_output = ""
+                try:
+                    cdp_output = conn.send_command("show cdp neighbors detail", read_timeout=15)
+                except Exception:
+                    pass
+
+                # Daftarkan device ini ke hasil
+                dev: dict[str, Any] = {
+                    "id": hostname,
+                    "name": hostname,
+                    "host": ip,
+                    "port": int(seed.get("port", 22)),
+                    "device_type": seed.get("device_type", "cisco_ios"),
+                    "role": seed.get("role", "router"),
+                    "enabled": True,
+                }
+                if hostname not in visited_ids:
+                    visited_ids.add(hostname)
+                    discovered.append(dev)
+
+                # Parse CDP → tambah links + queue IP neighbor baru
+                if cdp_output:
+                    for nbr in parse_cdp_detail(cdp_output):
+                        all_links.append({
+                            "from": hostname,
+                            "from_intf": nbr["local_intf"],
+                            "to": nbr["hostname"],
+                            "to_intf": nbr["remote_intf"],
+                        })
+                        if nbr["ip"] and nbr["ip"] not in visited_ips:
+                            queue.append({
+                                "host": nbr["ip"],
+                                "id": nbr["hostname"],
+                                "device_type": nbr["device_type"],
+                                "role": nbr["role"],
+                                "port": 22,
+                            })
+            finally:
+                conn.disconnect()
+
+        except NETMIKO_EXCEPTIONS:
+            errors.append(f"{ip}: SSH gagal (timeout / auth salah)")
+        except Exception as exc:
+            errors.append(f"{ip}: {exc}")
+
+    # Dedup links: pair (A→B) dan (B→A) dianggap satu link yang sama
+    seen_pairs: set[frozenset] = set()
+    unique_links: list[dict] = []
+    for lk in all_links:
+        pair = frozenset([lk["from"], lk["to"]])
+        if pair not in seen_pairs:
+            seen_pairs.add(pair)
+            unique_links.append(lk)
+
+    return {
+        "found": [d["id"] for d in discovered],
+        "devices": discovered,
+        "links": unique_links,
+        "errors": errors,
+    }
 
 
 def scan_network(
@@ -970,11 +1130,18 @@ def scan_network(
     password: str,
     secret: str | None = None,
     subnets: list[str] | None = None,
+    seed_devices: list[dict[str, Any]] | None = None,
 ) -> dict:
     """
-    Auto-discover device di semua subnet lokal PC.
-    Return: {found, devices, links, subnets_scanned, errors}.
+    Auto-discover router di jaringan.
+    Jika seed_devices tersedia (inventory ada isinya): pakai BFS via CDP — lebih akurat, tidak butuh ping.
+    Jika inventory kosong: fallback ke ping sweep subnet lokal (bootstrap pertama kali).
     """
+    # Prioritas utama: BFS dari seeds yang sudah SSH-able
+    if seed_devices:
+        return discover_topology(seed_devices, username, password, secret)
+
+    # Fallback: ping sweep untuk kasus inventory benar-benar kosong
     if subnets is None:
         subnets = get_local_subnets()
 
@@ -984,16 +1151,13 @@ def scan_network(
             "devices": [],
             "links": [],
             "subnets_scanned": [],
-            "errors": ["Tidak ada subnet lokal yang terdeteksi."],
+            "errors": ["Inventory kosong dan tidak ada subnet lokal yang terdeteksi."],
         }
 
-    # Ping sweep semua subnet secara paralel
     all_ips: list[str] = []
     for subnet_str in subnets:
         try:
             network = ipaddress.IPv4Network(subnet_str, strict=False)
-            if network.prefixlen < 16:
-                continue  # skip subnet terlalu besar (> /16)
             all_ips.extend(str(h) for h in network.hosts())
         except ValueError:
             pass
@@ -1009,51 +1173,19 @@ def scan_network(
             except Exception:
                 pass
 
-    # SSH discover tiap live IP secara paralel
-    raw_devices: list[dict] = []
-    errors: list[str] = []
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        futures = {pool.submit(try_ssh_discover, ip, username, password, secret): ip for ip in live_ips}
-        for future in as_completed(futures):
-            ip = futures[future]
-            try:
-                result = future.result()
-                if result:
-                    raw_devices.append(result)
-                else:
-                    errors.append(f"{ip}: SSH gagal atau bukan network device")
-            except Exception as exc:
-                errors.append(f"{ip}: {exc}")
-
-    # Dedup device berdasarkan id
-    seen_ids: set[str] = set()
-    unique_devices: list[dict] = []
-    for dev in raw_devices:
-        if dev["id"] not in seen_ids:
-            seen_ids.add(dev["id"])
-            unique_devices.append(dev)
-
-    # Bangun links dari CDP, lalu dedup pair (A→B sama dengan B→A)
-    all_links: list[dict] = []
-    for dev in unique_devices:
-        cdp_output = dev.pop("cdp_output", "")
-        if cdp_output:
-            all_links.extend(parse_cdp_neighbors(cdp_output, dev["id"]))
-
-    seen_pairs: set[frozenset] = set()
-    unique_links: list[dict] = []
-    for link in all_links:
-        pair = frozenset([link["from"], link["to"]])
-        if pair not in seen_pairs:
-            seen_pairs.add(pair)
-            unique_links.append(link)
+    # Dari tiap live IP, coba SSH — kalau berhasil langsung BFS via CDP
+    if live_ips:
+        bootstrap_seeds = [{"host": ip, "device_type": "cisco_ios", "role": "router", "port": 22} for ip in live_ips]
+        result = discover_topology(bootstrap_seeds, username, password, secret)
+        result["subnets_scanned"] = subnets
+        return result
 
     return {
-        "found": [dev["id"] for dev in unique_devices],
-        "devices": unique_devices,
-        "links": unique_links,
+        "found": [],
+        "devices": [],
+        "links": [],
         "subnets_scanned": subnets,
-        "errors": errors,
+        "errors": ["Ping sweep: tidak ada host yang merespons di subnet lokal."],
     }
 
 

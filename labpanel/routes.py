@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import wraps
 from pathlib import Path
@@ -18,6 +19,7 @@ from automation import (
     apply_interface_action,
     batch_raw_cli,
     check_device_reachable,
+    discover_topology,
     execute_batch,
     execute_terminal_command,
     find_device,
@@ -97,6 +99,47 @@ def _get_connection_fields(form=None, device=None) -> dict[str, str]:
         "device_type": device_type,
         "label": label,
     }
+
+
+# ── Background Network Scan ───────────────────────────────────────────────────
+
+_scan_lock = threading.Lock()
+_scan_state: dict = {"running": False, "last_result": None}
+
+
+def _run_background_scan(inventory_path: Path, username: str, password: str, secret: str | None) -> None:
+    """
+    Background thread: discover topology dari inventory yang ada sebagai seeds via CDP BFS.
+    Kalau inventory kosong, fallback ke ping sweep subnet lokal.
+    Update inventory.json jika ada device ditemukan.
+    """
+    with _scan_lock:
+        _scan_state["running"] = True
+        _scan_state["last_result"] = None
+    try:
+        # Load inventory saat ini sebagai seeds — ini yang sudah bisa di-SSH
+        try:
+            inv_data = automation.load_inventory(inventory_path)
+            seeds = inv_data.get("devices", [])
+        except Exception:
+            seeds = []
+
+        result = scan_network(username, password, secret, seed_devices=seeds if seeds else None)
+
+        if result["found"]:
+            raw = automation._load_raw_inventory(inventory_path)
+            raw["devices"] = result["devices"]
+            raw["links"] = result["links"]
+            automation._save_raw_inventory(raw, inventory_path)
+
+        with _scan_lock:
+            _scan_state["last_result"] = result
+    except Exception as exc:
+        with _scan_lock:
+            _scan_state["last_result"] = {"found": [], "devices": [], "links": [], "errors": [str(exc)]}
+    finally:
+        with _scan_lock:
+            _scan_state["running"] = False
 
 
 def login_required(view):
@@ -199,6 +242,22 @@ def register_routes(app):
                 session["logged_in"] = True
                 session["web_username"] = username
                 flash("Login berhasil.", "success")
+
+                # Trigger background scan sekali per sesi, asal tidak sedang berjalan
+                with _scan_lock:
+                    already_running = _scan_state["running"]
+                if not already_running:
+                    dev_user = current_app.config["LAB_DEVICE_USERNAME"]
+                    dev_pass = current_app.config["LAB_DEVICE_PASSWORD"]
+                    dev_secret = current_app.config["LAB_DEVICE_SECRET"] or None
+                    inv_path = _get_inventory_path()
+                    t = threading.Thread(
+                        target=_run_background_scan,
+                        args=(inv_path, dev_user, dev_pass, dev_secret),
+                        daemon=True,
+                    )
+                    t.start()
+
                 return redirect(url_for("dashboard"))
             flash("Username atau password web salah.", "error")
         return render_template("login.html", title="Login")
@@ -549,12 +608,21 @@ def register_routes(app):
     @app.route("/api/topology/scan", methods=["POST"])
     @login_required
     def api_topology_scan():
-        """Auto-scan semua subnet lokal untuk menemukan router aktif via SSH + CDP."""
+        """
+        Manual trigger topology scan (tombol 'Scan Network' di dashboard).
+        Pakai inventory yang ada sebagai seeds → BFS via CDP.
+        """
         username = current_app.config["LAB_DEVICE_USERNAME"]
         password = current_app.config["LAB_DEVICE_PASSWORD"]
         secret = current_app.config["LAB_DEVICE_SECRET"] or None
 
-        result = scan_network(username, password, secret)
+        try:
+            inv_data = load_inventory(_get_inventory_path())
+            seeds = inv_data.get("devices", [])
+        except Exception:
+            seeds = []
+
+        result = scan_network(username, password, secret, seed_devices=seeds if seeds else None)
 
         if result["found"]:
             raw = automation._load_raw_inventory(_get_inventory_path())
@@ -566,10 +634,19 @@ def register_routes(app):
             "ok": True,
             "found": result["found"],
             "links": result["links"],
-            "subnets_scanned": result["subnets_scanned"],
+            "subnets_scanned": result.get("subnets_scanned", []),
             "errors": result.get("errors", []),
             "message": f"Ditemukan {len(result['found'])} device, {len(result['links'])} link CDP.",
         })
+
+    @app.route("/api/scan/status")
+    @login_required
+    def api_scan_status():
+        """Status background scan yang berjalan saat login."""
+        with _scan_lock:
+            running = _scan_state["running"]
+            last = _scan_state["last_result"]
+        return jsonify({"running": running, "result": last})
 
     @app.route("/batch/raw", methods=["POST"])
     @login_required
