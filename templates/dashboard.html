@@ -629,10 +629,13 @@
       html += '</div>';
 
       if (found.length) {
+        html += '<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">';
+        html += '<p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Pilih cara menerapkan hasil scan ke inventory:</p>';
         html += '<div style="display:flex;gap:8px;justify-content:flex-end;">';
         html += '<button type="button" class="secondary" onclick="closeScanModal()" style="font-size:12px;padding:5px 12px;">Tutup</button>';
-        html += '<button type="button" onclick="closeScanModal();location.reload();" style="font-size:12px;padding:5px 14px;">Terapkan &amp; Reload</button>';
-        html += '</div>';
+        html += '<button type="button" class="secondary" onclick="applyScan(\'merge\')" style="font-size:12px;padding:5px 12px;" title="Pertahankan device offline, tambah/update yang ditemukan">Update (Merge)</button>';
+        html += '<button type="button" onclick="applyScan(\'replace\')" style="font-size:12px;padding:5px 14px;background:var(--danger);border-color:var(--danger);" title="Hapus semua yang tidak ditemukan, tulis ulang inventory">Ganti Topologi</button>';
+        html += '</div></div>';
       } else {
         html += '<div style="text-align:right;"><button type="button" onclick="closeScanModal()" class="secondary" style="font-size:12px;padding:5px 12px;">Tutup</button></div>';
       }
@@ -644,6 +647,31 @@
       document.getElementById("btnCloseScanModal").style.display = "";
       document.getElementById("scanResult").style.display = "";
       document.getElementById("scanResult").innerHTML = '<p class="text-error">Network error: ' + err.message + '</p>';
+    });
+  }
+
+  function applyScan(mode) {
+    var res = document.getElementById("scanResult");
+    res.innerHTML = '<p class="muted small" style="text-align:center;padding:8px 0;">Menerapkan perubahan...</p>';
+    fetch("{{ url_for('api_topology_apply') }}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": "{{ csrf_token() }}"
+      },
+      body: JSON.stringify({ mode: mode })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        closeScanModal();
+        location.reload();
+      } else {
+        res.innerHTML = '<p class="text-error" style="font-size:13px;">' + (data.error || "Gagal menerapkan.") + '</p>';
+      }
+    })
+    .catch(function(err) {
+      res.innerHTML = '<p class="text-error" style="font-size:13px;">Network error: ' + err.message + '</p>';
     });
   }
 

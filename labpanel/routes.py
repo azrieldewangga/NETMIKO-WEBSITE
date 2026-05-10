@@ -49,7 +49,7 @@ def _cred_key(device_id: str) -> str:
 def _get_device_credentials(device_id: str, form=None):
     """
     Cari tau kredensial SSH buat perangkat tertentu.
-    Prioritas: isian form -> session key tiap perangkat -> config bawaan global.
+    Prioritas: isian form -> session key tiap perangkat -> global session -> config bawaan global.
     """
     form = form or request.form
     cred_key = _cred_key(device_id)
@@ -58,16 +58,19 @@ def _get_device_credentials(device_id: str, form=None):
     username = (
         form.get("device_username")
         or stored.get("username")
+        or session.get("global_username")
         or current_app.config["LAB_DEVICE_USERNAME"]
     ).strip()
     password = (
         form.get("device_password")
         or stored.get("password")
+        or session.get("global_password")
         or current_app.config["LAB_DEVICE_PASSWORD"]
     )
     secret = (
         form.get("device_secret")
         or stored.get("secret")
+        or session.get("global_secret")
         or current_app.config["LAB_DEVICE_SECRET"]
     )
     return username, password, secret
@@ -218,6 +221,44 @@ _scan_lock = threading.Lock()
 _scan_state: dict = {"running": False, "last_result": None}
 
 
+def _merge_scan_into_inventory(raw: dict, result: dict) -> None:
+    """
+    Merge hasil scan ke inventory yang ada — jangan hapus device offline.
+
+    Aturan:
+    - Device yang berhasil di-SSH (discovered): update atau tambah ke inventory.
+    - Device yang sudah ada tapi tidak ditemukan scan (offline): tetap dipertahankan.
+    - Links: pakai hasil CDP (discovered) + pertahankan link lama milik device offline.
+    """
+    existing: dict[str, dict] = {str(d["id"]): d for d in raw.get("devices", [])}
+    discovered: dict[str, dict] = {str(d["id"]): d for d in result.get("devices", [])}
+
+    # Update existing dengan data segar, tambah device baru dari scan
+    merged = {**existing, **discovered}
+    raw["devices"] = list(merged.values())
+
+    # Links: ambil dari hasil scan, plus pertahankan link lama untuk device yang offline
+    offline_ids = set(existing.keys()) - set(discovered.keys())
+    old_links = raw.get("links", [])
+    new_links = result.get("links", [])
+
+    kept_offline_links = [
+        lk for lk in old_links
+        if lk.get("from") in offline_ids or lk.get("to") in offline_ids
+    ]
+
+    # Dedup berdasarkan pasangan device (arah tidak dipertimbangkan)
+    seen: set[frozenset] = set()
+    merged_links: list[dict] = []
+    for lk in new_links + kept_offline_links:
+        pair: frozenset = frozenset([lk.get("from"), lk.get("to")])
+        if pair not in seen:
+            seen.add(pair)
+            merged_links.append(lk)
+
+    raw["links"] = merged_links
+
+
 def _run_background_scan(inventory_path: Path, username: str, password: str, secret: str | None) -> None:
     """
     Background thread: discover topology dari inventory yang ada sebagai seeds via CDP BFS.
@@ -239,8 +280,7 @@ def _run_background_scan(inventory_path: Path, username: str, password: str, sec
 
         if result["found"]:
             raw = automation._load_raw_inventory(inventory_path)
-            raw["devices"] = result["devices"]
-            raw["links"] = result["links"]
+            _merge_scan_into_inventory(raw, result)
             automation._save_raw_inventory(raw, inventory_path)
 
         with _scan_lock:
@@ -698,8 +738,9 @@ def register_routes(app):
     @login_required
     def api_topology_scan():
         """
-        Manual trigger topology scan (tombol 'Scan Network' di dashboard).
-        Pakai inventory yang ada sebagai seeds → BFS via CDP.
+        Manual trigger topology scan. Scan saja, TIDAK langsung simpan ke inventory.
+        Hasil disimpan sementara di _scan_state["last_result"] untuk di-apply lewat
+        /api/topology/apply setelah user memilih mode (merge atau replace).
         """
         username = current_app.config["LAB_DEVICE_USERNAME"]
         password = current_app.config["LAB_DEVICE_PASSWORD"]
@@ -713,20 +754,45 @@ def register_routes(app):
 
         result = scan_network(username, password, secret, seed_devices=seeds if seeds else None)
 
-        if result["found"]:
-            raw = automation._load_raw_inventory(_get_inventory_path())
-            raw["devices"] = result["devices"]
-            raw["links"] = result["links"]
-            automation._save_raw_inventory(raw, _get_inventory_path())
+        with _scan_lock:
+            _scan_state["last_result"] = result
 
         return jsonify({
             "ok": True,
             "found": result["found"],
+            "devices": result["devices"],
             "links": result["links"],
             "subnets_scanned": result.get("subnets_scanned", []),
             "errors": result.get("errors", []),
-            "message": f"Ditemukan {len(result['found'])} device, {len(result['links'])} link CDP.",
         })
+
+    @app.route("/api/topology/apply", methods=["POST"])
+    @login_required
+    def api_topology_apply():
+        """
+        Terapkan hasil scan terakhir ke inventory.json.
+        Body JSON: { "mode": "merge" | "replace" }
+          merge   — pertahankan device offline, tambah/update yang ditemukan.
+          replace — hapus semua yang tidak ditemukan, tulis ulang inventory.
+        """
+        body = request.get_json(silent=True, force=True) or {}
+        mode = body.get("mode", "merge")
+
+        with _scan_lock:
+            result = _scan_state.get("last_result")
+
+        if not result or not result.get("found"):
+            return jsonify({"ok": False, "error": "Tidak ada hasil scan yang tersedia."})
+
+        raw = automation._load_raw_inventory(_get_inventory_path())
+        if mode == "replace":
+            raw["devices"] = result["devices"]
+            raw["links"] = result["links"]
+        else:
+            _merge_scan_into_inventory(raw, result)
+        automation._save_raw_inventory(raw, _get_inventory_path())
+
+        return jsonify({"ok": True, "mode": mode})
 
     @app.route("/api/scan/status")
     @login_required
@@ -765,22 +831,38 @@ def register_routes(app):
             return jsonify({"ok": False, "error": "Raw CLI tidak boleh kosong."})
 
         import re as _re
-        device_match = _re.match(r"\[([^\]]+)\]", raw_text)
-        if not device_match:
+
+        # Parse multiple blocks: [r1]\ncmds...\n[r2]\ncmds...
+        blocks: list[tuple[list[str], list[str]]] = []
+        current_devices: list[str] | None = None
+        current_commands: list[str] = []
+        for line in raw_text.splitlines():
+            block_match = _re.match(r"\[([^\]]+)\]", line.strip())
+            if block_match:
+                if current_devices is not None and current_commands:
+                    blocks.append((current_devices, current_commands))
+                current_devices = [d.strip() for d in block_match.group(1).split(",") if d.strip()]
+                current_commands = []
+            elif current_devices is not None and line.strip():
+                current_commands.append(line)
+        if current_devices is not None and current_commands:
+            blocks.append((current_devices, current_commands))
+
+        if not blocks:
             return jsonify({"ok": False, "error": "Format tidak valid. Awali dengan [device1, device2]."})
 
-        device_ids = [d.strip() for d in device_match.group(1).split(",") if d.strip()]
-        commands = [line for line in raw_text[device_match.end():].strip().splitlines() if line.strip()]
+        all_successful: list[dict] = []
+        all_failed: list[dict] = []
+        for device_ids, commands in blocks:
+            block_results = batch_raw_cli(device_ids, commands, inventory, username, password, secret)
+            all_successful.extend(block_results.get("successful", []))
+            all_failed.extend(block_results.get("failed", []))
+            for r in block_results.get("successful", []):
+                log_activity(r["device"], "INFO", "batch_raw_cli", f"{len(commands)} commands", user=session.get("web_username"))
+            for r in block_results.get("failed", []):
+                log_activity(r["device"], "ERROR", "batch_raw_cli", r["error"], user=session.get("web_username"))
 
-        if not device_ids or not commands:
-            return jsonify({"ok": False, "error": "Device ID atau commands kosong."})
-
-        results = batch_raw_cli(device_ids, commands, inventory, username, password, secret)
-
-        for r in results.get("successful", []):
-            log_activity(r["device"], "INFO", "batch_raw_cli", f"{len(commands)} commands", user=session.get("web_username"))
-        for r in results.get("failed", []):
-            log_activity(r["device"], "ERROR", "batch_raw_cli", r["error"], user=session.get("web_username"))
+        results = {"successful": all_successful, "failed": all_failed}
 
         return jsonify({"ok": True, "results": results})
 
@@ -946,6 +1028,9 @@ def register_routes(app):
     @login_required
     def devices_page():
         inventory = load_inventory(_get_inventory_path())["devices"]
+        statuses = _get_device_statuses(inventory)
+        for device in inventory:
+            device["status"] = statuses.get(str(device["id"]), "unknown")
         return render_template("devices.html", title="Devices", inventory=inventory)
 
     # ── PROFILE ───────────────────────────────────────────────

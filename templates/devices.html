@@ -133,6 +133,19 @@
     });
   }
 
+  function renderOfflineRow(row, errMsg) {
+    row.querySelector('.col-uptime').innerHTML =
+      '<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:4px;'
+      + 'background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);font-size:12px;color:var(--danger);">'
+      + '<span style="width:6px;height:6px;border-radius:50%;background:var(--danger);flex-shrink:0;"></span>'
+      + 'Offline</span>';
+    row.querySelector('.col-ios').innerHTML = '';
+    row.querySelector('.col-hw').innerHTML = '';
+    row.querySelector('.col-routes').innerHTML = '';
+    row.querySelector('.col-ifaces').innerHTML =
+      '<span style="color:var(--muted);font-size:11px;">' + escapeHtml(errMsg || 'SSH tidak dapat dijangkau') + '</span>';
+  }
+
   function fetchDevice(deviceId) {
     var row = document.getElementById('row-' + deviceId);
     if (!row) return Promise.resolve();
@@ -141,15 +154,8 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data.ok || (data.detail && data.detail.error)) {
-          var errMsg = (data.detail && data.detail.error) ? data.detail.error : (data.error || 'Gagal');
-          row.querySelector('.col-uptime').innerHTML =
-            '<span style="color:var(--danger);font-size:12px;display:flex;align-items:center;gap:5px;">'
-            + '<span class="status-dot red"></span>Gagal terhubung</span>';
-          row.querySelector('.col-ios').innerHTML = '';
-          row.querySelector('.col-hw').innerHTML = '';
-          row.querySelector('.col-routes').innerHTML = '';
-          row.querySelector('.col-ifaces').innerHTML =
-            '<span style="color:var(--muted);font-size:11px;">' + escapeHtml(errMsg) + '</span>';
+          var errMsg = (data.detail && data.detail.error) ? data.detail.error : (data.error || 'SSH tidak dapat dijangkau');
+          renderOfflineRow(row, errMsg);
           return;
         }
         var d = data.detail;
@@ -163,12 +169,7 @@
         row.querySelector('.col-ifaces').innerHTML = renderIfaces(d.interfaces);
       })
       .catch(function (err) {
-        row.querySelector('.col-uptime').innerHTML =
-          '<span style="color:var(--danger);font-size:12px;">Error</span>';
-        ['col-ios', 'col-hw', 'col-routes', 'col-ifaces'].forEach(function (cls) {
-          var cell = row.querySelector('.' + cls);
-          if (cell) cell.innerHTML = '';
-        });
+        renderOfflineRow(row, 'Network error: ' + err.message);
       });
   }
 
@@ -186,8 +187,16 @@
     });
   }
 
+
   document.addEventListener('DOMContentLoaded', function () {
-    INVENTORY.forEach(function (dev) { fetchDevice(dev.id); });
+    INVENTORY.forEach(function (dev) {
+      if (dev.status === 'offline') {
+        var row = document.getElementById('row-' + dev.id);
+        if (row) renderOfflineRow(row, 'SSH tidak dapat dijangkau');
+      } else {
+        fetchDevice(dev.id);
+      }
+    });
   });
 </script>
 {% endblock %}
