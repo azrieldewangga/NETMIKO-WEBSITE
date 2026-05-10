@@ -1,0 +1,44 @@
+{
+  "users": [
+    {
+      "id": "5a01e9af-5e0d-42e2-99a6-767566277c14",
+      "username": "admin",
+      "password_hash": "scrypt:32768:8:1$Pcgri78IaL2O6RJe$d5027292354631355ac958f66e7b5c817d51ea09e9f4a5a3a688ff69d97c808e9040c38b1cc6dabb5304b2a579c1f91469f4e226929478a945e2469ae8e9c815",
+      "role": "super_admin",
+      "display_name": "Admin",
+      "avatar": null,
+      "created_at": "2026-05-10T07:27:53.042517Z",
+      "active": true
+    },
+    {
+      "id": "d72fd5cb-aac5-42e2-8b0d-d3f300ff9346",
+      "username": "karyawan1",
+      "password_hash": "scrypt:32768:8:1$vvGrkjHf1OpjVpuF$8fbf6b21841547c12e3ebcab7068e773bcde087231356dc31f112b0edc201f912d9433118f35d8b3d985bc8cd8ac5438ce0407a28e14c8a9b48fba0418c4b6ec",
+      "role": "user",
+      "display_name": "Karyawan Satu",
+      "avatar": null,
+      "created_at": "2026-05-10T07:36:23.592121Z",
+      "active": true
+    },
+    {
+      "id": "96de8cf8-76c0-49f2-904a-9518b4b902ea",
+      "username": "Admin2",
+      "password_hash": "scrypt:32768:8:1$BCIFFmWWeLVge6yC$cf30d7333f4e97f691429e7c85d38026e254fe760a0e43914d4623395175dca8d7053f89b71dc68ad1dfd3603c8532df746d997cf340a87ec8a6b918b0cd25fc",
+      "role": "admin",
+      "display_name": "Admin",
+      "avatar": null,
+      "created_at": "2026-05-10T07:39:34.773816Z",
+      "active": true
+    },
+    {
+      "id": "63d6ce10-7bec-46e6-81f8-7f8c356dee03",
+      "username": "testadmin",
+      "password_hash": "scrypt:32768:8:1$ceSxl5MdHYdV0wvp$c1cc1366516f0809b414d8e4a6b05d612d8c09621acffd9d3cae75c2c24b8ce8fa028cce85e2189eb0583ab6460cd2e59ec54079bf55e74138bdd2629aa40943",
+      "role": "admin",
+      "display_name": "Test Admin",
+      "avatar": null,
+      "created_at": "2026-05-10T07:49:16.644486Z",
+      "active": true
+    }
+  ]
+}

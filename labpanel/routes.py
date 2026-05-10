@@ -10,6 +10,7 @@ from functools import wraps
 from pathlib import Path
 
 from flask import abort, flash, current_app, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import csrf, limiter
 
@@ -293,14 +294,71 @@ def _run_background_scan(inventory_path: Path, username: str, password: str, sec
             _scan_state["running"] = False
 
 
+# ── User helpers (users.json) ────────────────────────────────────────────────
+
+def _get_users_path() -> Path:
+    return Path(current_app.config["USERS_PATH"])
+
+
+def _load_users() -> list[dict]:
+    path = _get_users_path()
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8")).get("users", [])
+        except Exception:
+            pass
+    return []
+
+
+def _save_users(users: list[dict]) -> None:
+    path = _get_users_path()
+    path.write_text(json.dumps({"users": users}, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _find_user_by_id(user_id: str) -> dict | None:
+    for u in _load_users():
+        if u["id"] == user_id:
+            return u
+    return None
+
+
+def _find_user_by_username(username: str) -> dict | None:
+    for u in _load_users():
+        if u["username"] == username:
+            return u
+    return None
+
+
+# ── Auth decorators ───────────────────────────────────────────────────────────
+
+ROLE_HIERARCHY = {"user": 0, "admin": 1, "super_admin": 2}
+
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if not session.get("logged_in"):
             return redirect(url_for("login"))
         return view(*args, **kwargs)
-
     return wrapped
+
+
+def role_required(*roles):
+    """Decorator: batasi akses hanya untuk role tertentu.
+    Contoh: @role_required('admin', 'super_admin')
+    """
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if not session.get("logged_in"):
+                return redirect(url_for("login"))
+            current_role = session.get("role", "user")
+            if current_role not in roles:
+                flash("Akses ditolak. Anda tidak memiliki izin untuk halaman ini.", "error")
+                return render_template("403.html", title="403 Forbidden"), 403
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def register_routes(app):
@@ -366,13 +424,24 @@ def register_routes(app):
         if request.method == "POST":
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
-            if username == current_app.config["WEB_USERNAME"] and password == current_app.config["WEB_PASSWORD"]:
+
+            # Autentikasi via users.json (multi-user RBAC)
+            user = _find_user_by_username(username)
+            auth_ok = (
+                user
+                and user.get("active", True)
+                and check_password_hash(user["password_hash"], password)
+            )
+
+            if auth_ok:
                 csrf_token = session.get("csrf_token")
                 session.clear()
                 if csrf_token:
                     session["csrf_token"] = csrf_token
                 session["logged_in"] = True
-                session["web_username"] = username
+                session["user_id"] = user["id"]
+                session["web_username"] = user["username"]
+                session["role"] = user.get("role", "user")
                 flash("Login berhasil.", "success")
 
                 # Trigger background scan sekali per sesi, asal tidak sedang berjalan
@@ -391,7 +460,7 @@ def register_routes(app):
                     t.start()
 
                 return redirect(url_for("dashboard"))
-            flash("Username atau password web salah.", "error")
+            flash("Username atau password salah, atau akun tidak aktif.", "error")
         return render_template("login.html", title="Login")
 
     @app.route("/logout")
@@ -418,6 +487,10 @@ def register_routes(app):
         connected = False
 
         if request.method == "POST":
+            # Cek role: hanya admin/super_admin yang bisa eksekusi aksi
+            if session.get("role", "user") not in ("admin", "super_admin"):
+                flash("Akses ditolak. Role Anda tidak memiliki izin untuk eksekusi aksi.", "error")
+                return redirect(url_for("device_detail", device_id=device_id))
             connection = _get_connection_fields(request.form, device=device)
             username, password, secret = _get_device_credentials(
                 device_id, request.form)
@@ -541,7 +614,7 @@ def register_routes(app):
         )
 
     @app.route("/connect", methods=["POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def quick_connect():
         host = request.form.get("host", "").strip()
         if not host:
@@ -630,7 +703,7 @@ def register_routes(app):
         )
 
     @app.route("/batch", methods=["GET", "POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def batch():
         inventory_data = load_inventory(_get_inventory_path())
         inventory = inventory_data["devices"]
@@ -689,7 +762,7 @@ def register_routes(app):
         )
 
     @app.route("/credentials/global", methods=["POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def save_global_credentials():
         """Simpen kredensial SSH global (yang dipake buat Batch) dari modal setting navbar."""
         session["global_username"] = request.form.get(
@@ -702,7 +775,7 @@ def register_routes(app):
         return redirect(request.referrer or url_for("dashboard"))
 
     @app.route("/api/topology/add-device", methods=["POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def api_add_device():
         """API endpoint untuk menambah device baru ke topology via modal form."""
         data = request.get_json(silent=True) or {}
@@ -735,7 +808,7 @@ def register_routes(app):
             return jsonify({"ok": False, "message": str(exc)}), 400
 
     @app.route("/api/topology/scan", methods=["POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def api_topology_scan():
         """
         Manual trigger topology scan. Scan saja, TIDAK langsung simpan ke inventory.
@@ -767,7 +840,7 @@ def register_routes(app):
         })
 
     @app.route("/api/topology/apply", methods=["POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def api_topology_apply():
         """
         Terapkan hasil scan terakhir ke inventory.json.
@@ -804,7 +877,7 @@ def register_routes(app):
         return jsonify({"running": running, "result": last})
 
     @app.route("/batch/raw", methods=["POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def batch_raw():
         """Eksekusi raw Cisco CLI ke beberapa device sekaligus (JSON response untuk AJAX)."""
         inventory_data = load_inventory(_get_inventory_path())
@@ -901,7 +974,7 @@ def register_routes(app):
         )
 
     @app.route("/terminal/connect", methods=["POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def terminal_connect():
         inventory = load_inventory(_get_inventory_path())["devices"]
         device_id = request.form.get("device_id", "").strip()
@@ -941,7 +1014,7 @@ def register_routes(app):
         return redirect(url_for("terminal_page"))
 
     @app.route("/terminal/execute", methods=["POST"])
-    @login_required
+    @role_required("admin", "super_admin")
     def terminal_execute():
         shell_id = _get_terminal_shell_id()
         if not shell_id:
@@ -1039,37 +1112,28 @@ def register_routes(app):
     def inject_profile_ctx():
         if session.get("logged_in"):
             try:
-                path = Path(current_app.config["PROFILE_PATH"])
-                data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-                return {"topbar_avatar": data.get("avatar")}
+                user = _find_user_by_id(session.get("user_id", ""))
+                if user:
+                    return {
+                        "topbar_avatar": user.get("avatar"),
+                        "current_role": user.get("role", "user"),
+                        "current_display_name": user.get("display_name") or user.get("username"),
+                    }
             except Exception:
                 pass
-        return {"topbar_avatar": None}
-
-    def _load_profile() -> dict:
-        path = Path(current_app.config["PROFILE_PATH"])
-        if path.exists():
-            try:
-                return json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        return {}
-
-    def _save_profile(data: dict):
-        path = Path(current_app.config["PROFILE_PATH"])
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        return {"topbar_avatar": None, "current_role": "user", "current_display_name": ""}
 
     @app.route("/profile")
     @login_required
     def profile():
-        data = _load_profile()
-        username = data.get("username") or current_app.config["WEB_USERNAME"]
-        avatar = data.get("avatar")
+        user = _find_user_by_id(session.get("user_id", "")) or {}
         return render_template(
             "profile.html",
             title="Profile",
-            username=username,
-            avatar=avatar,
+            username=user.get("username", session.get("web_username", "")),
+            display_name=user.get("display_name", ""),
+            avatar=user.get("avatar"),
+            role=user.get("role", "user"),
         )
 
     @app.route("/profile/save", methods=["POST"])
@@ -1078,35 +1142,49 @@ def register_routes(app):
         field = request.form.get("field", "").strip()
         value = request.form.get("value", "").strip()
 
-        if field not in ("username", "password"):
+        if field not in ("username", "password", "display_name"):
             return jsonify({"ok": False, "message": "Field tidak valid."})
         if not value:
             return jsonify({"ok": False, "message": "Value tidak boleh kosong."})
 
-        data = _load_profile()
-        data[field] = value
-        _save_profile(data)
-
-        # Update runtime config agar login langsung pakai kredensial baru
-        if field == "username":
-            current_app.config["WEB_USERNAME"] = value
-            session["web_username"] = value
-        elif field == "password":
-            current_app.config["WEB_PASSWORD"] = value
-
+        user_id = session.get("user_id", "")
+        users = _load_users()
+        updated = False
+        for u in users:
+            if u["id"] == user_id:
+                if field == "password":
+                    u["password_hash"] = generate_password_hash(value)
+                elif field == "username":
+                    # Pastikan username unik
+                    if any(x["username"] == value and x["id"] != user_id for x in users):
+                        return jsonify({"ok": False, "message": "Username sudah dipakai."})
+                    u["username"] = value
+                    session["web_username"] = value
+                elif field == "display_name":
+                    u["display_name"] = value
+                updated = True
+                break
+        if not updated:
+            return jsonify({"ok": False, "message": "User tidak ditemukan."})
+        _save_users(users)
         return jsonify({"ok": True})
 
     @app.route("/profile/avatar/delete", methods=["POST"])
     @login_required
     def profile_avatar_delete():
-        """Hapus foto profil — buang file dari disk dan kosongkan field avatar di profile.json."""
-        data = _load_profile()
-        old_filename = data.pop("avatar", None)
-        _save_profile(data)
-        if old_filename:
-            old_path = Path(current_app.config["UPLOAD_FOLDER"]) / old_filename
-            if old_path.exists():
-                old_path.unlink()
+        """Hapus foto profil user yang sedang login."""
+        user_id = session.get("user_id", "")
+        users = _load_users()
+        for u in users:
+            if u["id"] == user_id:
+                old_filename = u.pop("avatar", None)
+                if old_filename:
+                    old_path = Path(current_app.config["UPLOAD_FOLDER"]) / old_filename
+                    if old_path.exists():
+                        old_path.unlink(missing_ok=True)
+                u["avatar"] = None
+                break
+        _save_users(users)
         return jsonify({"ok": True})
 
     @app.route("/profile/avatar", methods=["POST"])
@@ -1123,11 +1201,119 @@ def register_routes(app):
         upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        filename = f"avatar.{ext}"
+        user_id = session.get("user_id", "unknown")
+        # Nama file unik per user agar tidak tabrakan
+        filename = f"avatar_{user_id[:8]}.{ext}"
         file.save(upload_dir / filename)
 
-        data = _load_profile()
-        data["avatar"] = filename
-        _save_profile(data)
-
+        users = _load_users()
+        for u in users:
+            if u["id"] == user_id:
+                u["avatar"] = filename
+                break
+        _save_users(users)
         return jsonify({"ok": True, "url": url_for("static", filename=f"uploads/{filename}")})
+
+    # ── USER MANAGEMENT (super_admin only) ─────────────────────────────────────
+
+    @app.route("/admin/users")
+    @role_required("super_admin")
+    def admin_users():
+        users = _load_users()
+        return render_template("admin_users.html", title="User Management", users=users)
+
+    @app.route("/admin/users/create", methods=["POST"])
+    @role_required("super_admin")
+    def admin_users_create():
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        display_name = request.form.get("display_name", "").strip()
+        role = request.form.get("role", "user").strip()
+
+        if not username or not password:
+            flash("Username dan password wajib diisi.", "error")
+            return redirect(url_for("admin_users"))
+        if role not in ("user", "admin", "super_admin"):
+            flash("Role tidak valid.", "error")
+            return redirect(url_for("admin_users"))
+
+        users = _load_users()
+        if any(u["username"] == username for u in users):
+            flash(f"Username '{username}' sudah dipakai.", "error")
+            return redirect(url_for("admin_users"))
+
+        import datetime
+        new_user = {
+            "id": str(uuid.uuid4()),
+            "username": username,
+            "password_hash": generate_password_hash(password),
+            "role": role,
+            "display_name": display_name or username.capitalize(),
+            "avatar": None,
+            "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "active": True,
+        }
+        users.append(new_user)
+        _save_users(users)
+        flash(f"User '{username}' berhasil dibuat.", "success")
+        return redirect(url_for("admin_users"))
+
+    @app.route("/admin/users/<user_id>/edit", methods=["POST"])
+    @role_required("super_admin")
+    def admin_users_edit(user_id: str):
+        users = _load_users()
+        target = next((u for u in users if u["id"] == user_id), None)
+        if not target:
+            flash("User tidak ditemukan.", "error")
+            return redirect(url_for("admin_users"))
+
+        new_username = request.form.get("username", "").strip()
+        new_display = request.form.get("display_name", "").strip()
+        new_role = request.form.get("role", target["role"]).strip()
+        new_password = request.form.get("password", "").strip()
+        new_active = request.form.get("active", "1") == "1"
+
+        if new_role not in ("user", "admin", "super_admin"):
+            flash("Role tidak valid.", "error")
+            return redirect(url_for("admin_users"))
+
+        if new_username and new_username != target["username"]:
+            if any(u["username"] == new_username and u["id"] != user_id for u in users):
+                flash(f"Username '{new_username}' sudah dipakai.", "error")
+                return redirect(url_for("admin_users"))
+            target["username"] = new_username
+
+        if new_display:
+            target["display_name"] = new_display
+        target["role"] = new_role
+        target["active"] = new_active
+        if new_password:
+            target["password_hash"] = generate_password_hash(new_password)
+
+        _save_users(users)
+        flash(f"User '{target['username']}' berhasil diperbarui.", "success")
+        return redirect(url_for("admin_users"))
+
+    @app.route("/admin/users/<user_id>/delete", methods=["POST"])
+    @role_required("super_admin")
+    def admin_users_delete(user_id: str):
+        # Cegah super_admin hapus akunnya sendiri
+        if user_id == session.get("user_id"):
+            flash("Tidak bisa menghapus akun Anda sendiri.", "error")
+            return redirect(url_for("admin_users"))
+
+        users = _load_users()
+        target = next((u for u in users if u["id"] == user_id), None)
+        if not target:
+            flash("User tidak ditemukan.", "error")
+            return redirect(url_for("admin_users"))
+
+        # Hapus avatar jika ada
+        if target.get("avatar"):
+            old_path = Path(current_app.config["UPLOAD_FOLDER"]) / target["avatar"]
+            old_path.unlink(missing_ok=True)
+
+        users = [u for u in users if u["id"] != user_id]
+        _save_users(users)
+        flash(f"User '{target['username']}' berhasil dihapus.", "success")
+        return redirect(url_for("admin_users"))
