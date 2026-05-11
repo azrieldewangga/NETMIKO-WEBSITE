@@ -18,6 +18,7 @@ import automation
 from automation import (
     ActionError,
     InventoryError,
+    MidSessionConnectionError,
     add_device_to_inventory,
     apply_interface_action,
     batch_raw_cli,
@@ -248,11 +249,14 @@ def _merge_scan_into_inventory(raw: dict, result: dict) -> None:
         if lk.get("from") in offline_ids or lk.get("to") in offline_ids
     ]
 
-    # Dedup berdasarkan pasangan device (arah tidak dipertimbangkan)
+    # Dedup berdasarkan pasangan interface endpoint (bukan hanya device),
+    # karena dua router bisa punya lebih dari satu jalur fisik.
     seen: set[frozenset] = set()
     merged_links: list[dict] = []
     for lk in new_links + kept_offline_links:
-        pair: frozenset = frozenset([lk.get("from"), lk.get("to")])
+        ep_a = (lk.get("from", ""), lk.get("from_intf", ""))
+        ep_b = (lk.get("to", ""), lk.get("to_intf", ""))
+        pair: frozenset = frozenset([ep_a, ep_b])
         if pair not in seen:
             seen.add(pair)
             merged_links.append(lk)
@@ -542,6 +546,8 @@ def register_routes(app):
                 elif action == "ssh_port" and not value:
                     error = "Value (Port) wajib diisi untuk mengubah SSH Port."
                 else:
+                    # Snapshot cache sebelum aksi — untuk deteksi apakah IP management interface berubah
+                    _cached_before, _ = _get_cached_iface(device_id)
                     try:
                         action_result = apply_interface_action(
                             device,
@@ -565,9 +571,51 @@ def register_routes(app):
                         else:
                             flash(
                                 f"Aksi '{action}' pada {device['id']}/{interface} berhasil.", "success")
+                            # Deteksi perubahan IP pada management interface (yang sama dengan host di inventory).
+                            # Kalau IP-nya diubah tanpa update inventory, device langsung tidak bisa diakses.
+                            if action.lower() in {"add", "change", "set", "ip"} and value and _cached_before:
+                                old_iface = next(
+                                    (i for i in _cached_before if i.get("interface") == interface), None
+                                )
+                                if old_iface:
+                                    old_ip = old_iface.get("ip_address", "unassigned").split("/")[0].strip()
+                                    if old_ip and old_ip not in ("unassigned", "") and old_ip == device["host"]:
+                                        new_host = value.split("/")[0].strip()
+                                        update_inventory_device(device_id, {"host": new_host})
+                                        device["host"] = new_host
+                                        connection["host"] = new_host
+                                        flash(
+                                            f"IP management interface {interface} berubah "
+                                            f"dari {old_ip} → {new_host}. Inventory diperbarui otomatis.",
+                                            "warning",
+                                        )
                         log_activity(device_id, "INFO", action, f"{action} {interface} → {value or '-'}", user=session.get("web_username"))
                         _invalidate_cached_iface(device_id)
                         connected = True
+                    except MidSessionConnectionError as exc:
+                        # Koneksi terputus setelah config dikirim — config kemungkinan sudah diterapkan.
+                        # Aman untuk update inventory secara optimistis jika ini adalah perubahan IP management.
+                        error = str(exc)
+                        log_activity(device_id, "ERROR", action or "connect", str(exc), user=session.get("web_username"))
+                        if action.lower() in {"add", "change", "set", "ip"} and value and _cached_before:
+                            old_iface = next(
+                                (i for i in _cached_before if i.get("interface") == interface), None
+                            )
+                            if old_iface:
+                                old_ip = old_iface.get("ip_address", "unassigned").split("/")[0].strip()
+                                if old_ip and old_ip not in ("unassigned", "") and old_ip == device["host"]:
+                                    new_host = value.split("/")[0].strip()
+                                    update_inventory_device(device_id, {"host": new_host})
+                                    device["host"] = new_host
+                                    connection["host"] = new_host
+                                    flash(
+                                        f"Koneksi SSH terputus setelah mengubah IP management "
+                                        f"{interface} dari {old_ip} → {new_host}. "
+                                        f"Inventory diperbarui otomatis. "
+                                        f"Hubungkan ulang ke {new_host} untuk melanjutkan.",
+                                        "warning",
+                                    )
+                        _invalidate_cached_iface(device_id)
                     except (automation.ConnectionError, ActionError, ValueError) as exc:
                         error = str(exc)
                         log_activity(device_id, "ERROR", action or "connect", str(exc), user=session.get("web_username"))
@@ -686,6 +734,44 @@ def register_routes(app):
                 connected = True
         except (automation.ConnectionError, ActionError, ValueError) as exc:
             error = str(exc)
+
+        # Auto-add ke inventory jika koneksi berhasil dan host belum terdaftar
+        added_to_inventory = False
+        if connected and not error:
+            try:
+                import re as _re
+                existing_inv = load_inventory(_get_inventory_path())
+                existing_hosts = {str(d.get("host", "")).lower() for d in existing_inv["devices"]}
+                if connection["host"].lower() not in existing_hosts:
+                    safe_id = _re.sub(r"[^a-z0-9_-]", "_", ad_hoc_id.lower()).strip("_")
+                    if not safe_id:
+                        safe_id = "device_" + connection["host"].replace(".", "_")
+                    # Pastikan ID belum dipakai
+                    existing_ids = {str(d.get("id", "")).lower() for d in existing_inv["devices"]}
+                    base_id = safe_id
+                    counter = 2
+                    while safe_id in existing_ids:
+                        safe_id = f"{base_id}_{counter}"
+                        counter += 1
+                    new_device = {
+                        "id": safe_id,
+                        "name": ad_hoc_id,
+                        "host": connection["host"],
+                        "port": int(connection["port"]),
+                        "device_type": connection["device_type"],
+                        "role": "router",
+                        "enabled": True,
+                    }
+                    add_device_to_inventory(new_device, path=_get_inventory_path())
+                    flash(
+                        f"Device '{ad_hoc_id}' ({connection['host']}) berhasil ditambahkan ke inventory "
+                        f"dengan ID '{safe_id}'.",
+                        "success",
+                    )
+                    ad_hoc_id = safe_id
+                    added_to_inventory = True
+            except Exception:
+                pass  # Jangan gagalkan quick_connect hanya karena inventory write error
 
         return render_template(
             "device.html",

@@ -102,6 +102,19 @@
         placeholder="r1, GigabitEthernet0/0, add, 192.168.10.1/24&#10;r1;r2, Loopback0, description, ke-upstream">{% if batch_rows %}{% for r in batch_rows %}{{ r.device_ids | join(';') }},{{ r.interface }},{{ r.action }},{{ r.value }}
 {% endfor %}{% endif %}</textarea>
 
+      {% if parse_errors %}
+      <div class="alert error" style="margin-top:14px;">
+        <div>
+          <strong>Parse Error — perintah tidak dijalankan</strong>
+          <ul style="margin:8px 0 0 16px;">
+            {% for item in parse_errors %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="actions actions-end" style="margin-top:16px;">
         <button type="submit" id="execBtn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -259,15 +272,27 @@
       <div class="results-table-wrap">
         <table>
           <thead>
-            <tr><th>Line</th><th>Device</th><th>Interface</th><th>Action</th></tr>
+            <tr><th>Line</th><th>Device</th><th>Interface</th><th>Action</th><th>Value Diterapkan</th></tr>
           </thead>
           <tbody>
             {% for r in results.successful %}
             <tr class="row-ok">
               <td>{{ r.line_number }}</td>
-              <td><strong>{{ r.device }}</strong></td>
-              <td><code>{{ r.interface }}</code></td>
+              <td>
+                <strong>{{ r.device }}</strong>
+                <span style="font-size:11px;color:var(--muted);display:block;font-family:var(--font-mono);">{{ r.host }}</span>
+              </td>
+              <td><code>{{ r.interface or '—' }}</code></td>
               <td><span class="badge badge-success">{{ r.action }}</span></td>
+              <td>
+                <code>{{ r.value or '—' }}</code>
+                {% if r.commands %}
+                <details style="margin-top:5px;">
+                  <summary style="font-size:11px;color:var(--muted);cursor:pointer;user-select:none;">lihat perintah</summary>
+                  <pre style="margin-top:5px;font-size:11px;color:var(--muted);white-space:pre-wrap;">{{ r.commands | join('\n') }}</pre>
+                </details>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -293,14 +318,16 @@
       <div class="results-table-wrap">
         <table>
           <thead>
-            <tr><th>Line</th><th>Device</th><th>Error</th></tr>
+            <tr><th>Line</th><th>Device</th><th>Interface</th><th>Value</th><th>Error</th></tr>
           </thead>
           <tbody>
             {% for r in results.failed %}
             <tr class="row-fail">
               <td>{{ r.line_number }}</td>
               <td><strong>{{ r.device }}</strong></td>
-              <td class="text-error">{{ r.error }}</td>
+              <td><code>{{ r.interface or '—' }}</code></td>
+              <td><code style="color:var(--muted);">{{ r.value or '—' }}</code></td>
+              <td class="text-error" style="font-size:12px;">{{ r.error }}</td>
             </tr>
             {% endfor %}
           </tbody>

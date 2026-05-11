@@ -1,0 +1,240 @@
+[
+  {
+    "timestamp": "2026-05-11T11:12:30",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T11:12:46",
+    "level": "INFO",
+    "action": "add",
+    "detail": "add Ethernet1/0 → 172.20.10.5/30",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T11:14:32",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T11:18:09",
+    "level": "INFO",
+    "action": "terminal_connect",
+    "detail": "Connected via web terminal",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T11:18:20",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "show cdp neighbors detail",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T11:18:35",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T12:00:19",
+    "level": "WARNING",
+    "action": "connectivity_check",
+    "detail": "offline",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:09:07",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:57:50",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "\nPattern not detected: 'R5\\\\#' in output.\n\nThings you might try to fix this:\n1. Explicitly set your pattern using the expect_string argument.\n2. Increase the read_timeout to a larger value.\n\nYou can also look at the Netmiko session_log or debug log for more information.\n\n",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:57:58",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "description Loopback199 → BATCH-TEST-DESC",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:58:05",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:58:07",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:58:10",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "3 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:58:16",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "2 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:58:24",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:00:10",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T18:32:45",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.11/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:32:54",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "description Loopback199 → BATCH-TEST-DESC",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:33:03",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:33:08",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "3 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:33:17",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "2 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:33:27",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:34:12",
+    "level": "INFO",
+    "action": "add",
+    "detail": "add Loopback199 → 10.99.99.1/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:34:19",
+    "level": "INFO",
+    "action": "description",
+    "detail": "description Loopback199 → AUTOMATION-TEST-SAFE-TO-REMOVE",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:34:20",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T18:34:25",
+    "level": "INFO",
+    "action": "change",
+    "detail": "change Loopback199 → 10.99.99.2/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:34:31",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T18:34:32",
+    "level": "INFO",
+    "action": "delete",
+    "detail": "delete Loopback199 → -",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:35:00",
+    "level": "ERROR",
+    "action": "change",
+    "detail": "Koneksi terputus saat mengirim config: \n\nPattern not detected: 'no\\\\ shutdown' in output.\n\nThings you might try to fix this:\n1. Adjust the regex pattern to better identify the terminating string. Note, in\nmany situations the pattern is automatically based on the network device's prompt.\n2. Increase the read_timeout to a larger value.\n\nYou can also look at the Netmiko session_log or debug log for more information.\n\n",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:35:30",
+    "level": "ERROR",
+    "action": "change",
+    "detail": "Koneksi terputus saat mengirim config: \n\nPattern not detected: 'ip\\\\ address\\\\ 192\\\\.168\\\\.56\\\\.16\\\\ 255\\\\.255\\\\.255\\\\.0' in output.\n\nThings you might try to fix this:\n1. Adjust the regex pattern to better identify the terminating string. Note, in\nmany situations the pattern is automatically based on the network device's prompt.\n2. Increase the read_timeout to a larger value.\n\nYou can also look at the Netmiko session_log or debug log for more information.\n\n",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:35:34",
+    "level": "ERROR",
+    "action": "ssh_port",
+    "detail": "configure terminal\nEnter configuration commands, one per line.  End with CNTL/Z.\nR5(config)#ip ssh port 2222\n% Incomplete command.\n\nR5(config)#end\nR5#",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:35:39",
+    "level": "ERROR",
+    "action": "ssh_port",
+    "detail": "configure terminal\nEnter configuration commands, one per line.  End with CNTL/Z.\nR5(config)#ip ssh port 22\n                       ^\n% Invalid input detected at '^' marker.\n\nR5(config)#end\nR5#",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:35:44",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:36:22",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  }
+]

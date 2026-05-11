@@ -410,7 +410,14 @@
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
         <div class="form-group">
           <label>Perangkat Dst.</label>
-          <input name="connected_to" value="switch">
+          <select name="connected_to">
+            {% if switch_info %}
+            <option value="{{ switch_info.name }}">{{ switch_info.name }} ({{ switch_info.host }})</option>
+            {% endif %}
+            {% for dev in inventory %}
+            <option value="{{ dev.id }}">{{ dev.name }} – {{ dev.host }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="form-group">
           <label>Interface Src.</label>

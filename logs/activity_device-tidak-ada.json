@@ -1,0 +1,30 @@
+[
+  {
+    "timestamp": "2026-05-11T17:37:57",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "Device 'device-tidak-ada' was not found in the inventory.",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:04",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "Device 'device-tidak-ada' was not found in the inventory.",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:57:58",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "Device 'device-tidak-ada' was not found in the inventory.",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T18:32:54",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "Device 'device-tidak-ada' was not found in the inventory.",
+    "user": "admin"
+  }
+]

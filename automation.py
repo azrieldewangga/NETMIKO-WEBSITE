@@ -44,6 +44,12 @@ class ConnectionError(RuntimeError):
     pass
 
 
+class MidSessionConnectionError(ConnectionError):
+    """Koneksi terputus SETELAH config dikirim — bisa terjadi saat IP management interface diubah.
+    Config kemungkinan sudah diterapkan di router sebelum koneksi drop."""
+    pass
+
+
 class ActionError(RuntimeError):
     """Error yang dilempar kalau aksi konfigurasi ke device gagal atau tidak valid."""
     pass
@@ -590,11 +596,19 @@ def apply_interface_action(
     config = build_interface_config(action, interface, value)
     connection = connect_device(device, username, password, secret, host, port, device_type)
     try:
-        output = connection.send_config_set(config)
+        try:
+            output = connection.send_config_set(config)
+        except NETMIKO_EXCEPTIONS as exc:
+            # Koneksi terputus saat mengirim config — kemungkinan karena perubahan IP management.
+            # Config kemungkinan sudah diterapkan di router sebelum koneksi drop.
+            raise MidSessionConnectionError(f"Koneksi terputus saat mengirim config: {exc}") from exc
         # Deteksi pesan error dari output CLI Cisco
         if any(pattern.search(output) for pattern in ERROR_PATTERNS):
             raise ActionError(output.strip())
-        save_output = connection.save_config()
+        try:
+            save_output = connection.save_config()
+        except Exception:
+            save_output = "(config diterapkan — save gagal, koneksi terputus)"
         return {
             "device": device["id"],
             "host": host or device["host"],
@@ -607,7 +621,10 @@ def apply_interface_action(
             "status": "success",
         }
     finally:
-        connection.disconnect()
+        try:
+            connection.disconnect()
+        except Exception:
+            pass
 
 
 def parse_batch_rows(text: str) -> tuple[list[dict[str, Any]], list[str]]:
@@ -682,7 +699,7 @@ def execute_batch(
                 )
                 result["line_number"] = row["line_number"]
                 results["successful"].append(result)
-            except (InventoryError, ActionError, ConnectionError, ValueError) as exc:
+            except Exception as exc:
                 results["failed"].append(
                     {
                         "line_number": row["line_number"],
@@ -1169,11 +1186,14 @@ def discover_topology(
         except Exception as exc:
             errors.append(f"{ip}: {exc}")
 
-    # Dedup links: pair (A→B) dan (B→A) dianggap satu link yang sama
+    # Dedup links: (A, Eth0/0) ↔ (B, Eth0/0) adalah satu link, tapi (A, Eth1/0) ↔ (B, Eth0/1)
+    # adalah link BERBEDA — dua router bisa punya lebih dari satu jalur (switch + P2P langsung).
     seen_pairs: set[frozenset] = set()
     unique_links: list[dict] = []
     for lk in all_links:
-        pair = frozenset([lk["from"], lk["to"]])
+        ep_a = (lk.get("from", ""), lk.get("from_intf", ""))
+        ep_b = (lk.get("to", ""), lk.get("to_intf", ""))
+        pair = frozenset([ep_a, ep_b])
         if pair not in seen_pairs:
             seen_pairs.add(pair)
             unique_links.append(lk)

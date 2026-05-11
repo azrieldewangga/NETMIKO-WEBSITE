@@ -5,5 +5,229 @@
     "action": "connectivity_check",
     "detail": "offline",
     "user": null
+  },
+  {
+    "timestamp": "2026-05-10T12:10:34",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T20:09:05",
+    "level": "INFO",
+    "action": "terminal_connect",
+    "detail": "Connected via web terminal",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:09:11",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "conf t",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:09:17",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "exit",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:09:24",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "show ip int bri",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:09:31",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T20:49:00",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "configure terminal\nEnter configuration commands, one per line.  End with CNTL/Z.\nR2(config)#interface e1/2\nR2(config-if)# ip address 10.10.10.1 255.255.255.0\n% 10.10.10.0 overlaps with Ethernet1/0\nR2(config-if)# no shutdown\n% 10.10.10.0 overlaps with Ethernet1/0\nEthernet1/2: incorrect IP address assignment\nR2(config-if)#end\nR2#",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:50:44",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T11:15:48",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "Unsupported action 'change 192.168.52.4'.",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T11:16:02",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "Unsupported action 'change 192.168.52.4/24'.",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T11:16:34",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T12:00:13",
+    "level": "WARNING",
+    "action": "connectivity_check",
+    "detail": "offline",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:09:07",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:38:11",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:38:15",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "3 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:38:25",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "2 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:38:39",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:39:33",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:42:06",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.11/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:43:37",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:44:37",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:44:53",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.11/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:45:38",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:46:25",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.11/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:47:34",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:48:50",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.11/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:04",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "description Loopback199 → BATCH-TEST-DESC",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:18",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:23",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "3 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:32",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "2 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:46",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:58",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
   }
 ]

@@ -5,5 +5,362 @@
     "action": "connectivity_check",
     "detail": "offline",
     "user": null
+  },
+  {
+    "timestamp": "2026-05-10T12:10:34",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T12:10:56",
+    "level": "INFO",
+    "action": "terminal_connect",
+    "detail": "Connected via web terminal",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T12:11:00",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "conf t",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T12:11:22",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "int e1/0",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T12:11:43",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "ip add 192.168.1.15 255.255.255.0",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T12:11:52",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "exit",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T12:11:59",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "exit",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T12:12:05",
+    "level": "INFO",
+    "action": "terminal_cmd",
+    "detail": "show ip int brie",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T12:12:36",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T12:24:52",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "7 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T12:26:44",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T20:00:27",
+    "level": "WARNING",
+    "action": "connectivity_check",
+    "detail": "offline",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T20:04:33",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T20:45:57",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "'10.10.10.100/24192.168.55.99/24' does not appear to be an IPv4 or IPv6 interface",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:46:13",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "'10.10.10.100192.168.55.99/24' does not appear to be an IPv4 or IPv6 interface",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:46:25",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "'10.10.10.1192.168.55.99/24' does not appear to be an IPv4 or IPv6 interface",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:46:41",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T20:47:58",
+    "level": "ERROR",
+    "action": "batch_action",
+    "detail": "'10.10.10.1192.168.55.99/24' does not appear to be an IPv4 or IPv6 interface",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:48:42",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-10T20:49:00",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add e1/1 → 192.168.55.5",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-10T20:50:44",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:33:51",
+    "level": "INFO",
+    "action": "add",
+    "detail": "add Loopback199 → 10.99.99.1/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:33:57",
+    "level": "INFO",
+    "action": "description",
+    "detail": "description Loopback199 → AUTOMATION-TEST-SAFE-TO-REMOVE",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:34:04",
+    "level": "INFO",
+    "action": "change",
+    "detail": "change Loopback199 → 10.99.99.2/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:34:10",
+    "level": "INFO",
+    "action": "delete",
+    "detail": "delete Loopback199 → -",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:35:30",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:38:11",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:38:15",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "3 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:38:20",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "2 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:38:39",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:39:33",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:42:06",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.10/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:43:37",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:44:37",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:44:53",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.10/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:45:38",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:46:02",
+    "level": "INFO",
+    "action": "add",
+    "detail": "add Loopback199 → 10.99.99.1/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:46:09",
+    "level": "INFO",
+    "action": "delete",
+    "detail": "delete Loopback199 → -",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:46:25",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.10/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:47:34",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
+  },
+  {
+    "timestamp": "2026-05-11T17:48:13",
+    "level": "INFO",
+    "action": "add",
+    "detail": "add Loopback199 → 10.99.99.1/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:48:19",
+    "level": "INFO",
+    "action": "description",
+    "detail": "description Loopback199 → AUTOMATION-TEST-SAFE-TO-REMOVE",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:48:26",
+    "level": "INFO",
+    "action": "change",
+    "detail": "change Loopback199 → 10.99.99.2/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:48:32",
+    "level": "INFO",
+    "action": "delete",
+    "detail": "delete Loopback199 → -",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:48:50",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "add Loopback199 → 10.99.99.10/24",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:04",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "description Loopback199 → BATCH-TEST-DESC",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:18",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:23",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "3 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:27",
+    "level": "INFO",
+    "action": "batch_raw_cli",
+    "detail": "2 commands",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:46",
+    "level": "INFO",
+    "action": "batch_action",
+    "detail": "delete Loopback199 → ",
+    "user": "admin"
+  },
+  {
+    "timestamp": "2026-05-11T17:49:58",
+    "level": "INFO",
+    "action": "connectivity_check",
+    "detail": "online",
+    "user": null
   }
 ]
